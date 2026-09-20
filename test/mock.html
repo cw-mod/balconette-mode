@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>CatWar Balconette — мок игровой страницы</title>
+<style>
+  /* Грубая имитация игровой вёрстки: важны id и классы, не красота. */
+  html, body { margin: 0; padding: 0; background: #2b2b2b; font: 14px/1.4 sans-serif; color: #111; }
+  #app { display: block; width: 1000px; margin: auto; }
+  .game-topbar { background: rgba(255,255,255,.6); padding: 4px 6px; display: flex; gap: 8px; }
+  #main_table { border-collapse: separate; border-spacing: 0; width: 1000px; background: #000; }
+  #main_table td { padding: 0; }
+  #tr_chat > td { background: rgba(255,255,255,.55); padding: 6px; }
+  #chat_msg { height: 90px; overflow-y: auto; background: #fff8; padding: 4px; }
+  #sky { height: 150px; width: 100%; background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="%23244"/></svg>') repeat; }
+  #tr_tos > td { background: rgba(255,255,255,.55); padding: 4px 6px; display: flex; gap: 8px; align-items: center; }
+  #tos { width: 150px; height: 20px; background: linear-gradient(90deg,#8cf,#fc8); }
+  #cages_overflow { overflow: auto; }
+  #cages_div { width: 1000px; min-height: 900px; position: relative; z-index: 1;
+               background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%23384b2e"/><circle cx="20" cy="20" r="6" fill="%234b6139"/></svg>') repeat; }
+  #cages { border-collapse: collapse; }
+  td.cage { width: 100px; height: 150px; padding-bottom: 16px; vertical-align: top; }
+  .move_parent { display: block; position: relative; padding: 4px; background: #0006; color: #fff; text-align: center; }
+  #tr_info > td { background: #ffdead; padding: 6px; }
+  #info_main { width: 100%; }
+  #history_block { height: 160px; overflow-y: auto; background: rgba(255,255,255,.55); padding: 6px; }
+  #parameters_skills_block { background: rgba(255,255,255,.55); padding: 6px; }
+  #deys, #block_deys { display: flex; }
+  #akten a.dey { display: inline-block; margin: 2px; }
+  .mock-panel { position: fixed; right: 8px; top: 8px; z-index: 2147480000; background: #111d; color: #eee;
+                padding: 10px; border-radius: 8px; font: 12px/1.4 monospace; width: 220px; }
+  .mock-panel button { display: block; width: 100%; margin: 3px 0; font: inherit; cursor: pointer; }
+  .mock-panel h4 { margin: 0 0 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div id="app" data-mobile="0" class="compact compact-cols-3 compact-actions-left">
+  <div class="game-topbar">
+    <nav class="game-topbar-nav"><a href="#">Игровая</a><a href="#">ЛС <span id="newls">0</span></a></nav>
+  </div>
+  <p id="error"></p>
+
+  <table id="main_table"><tbody>
+    <tr id="tr_chat"><td>
+      <div id="chat_msg"><div class="chat_text">Мок: сообщение чата</div></div>
+      <form id="chat_form"><input id="text" class="chat-input-field" placeholder="Сообщение"><button id="msg_send" type="button">→</button></form>
+    </td></tr>
+
+    <tr id="tr_actions"><td>
+      <div id="block_deys">
+        <div id="deys"><div id="akten"></div></div>
+        <div id="deys_mit"><select id="mit"><option value="0">Действия с собой</option></select></div>
+      </div>
+    </td></tr>
+
+    <tr id="tr_mouth"><td><div id="itemList"></div><div id="thdey"><ul><li>Уникальный ID: 9001</li></ul></div></td></tr>
+
+    <!-- Структура строки погоды повторяет сохранённый HTML игровой:
+         #tos, <a id="hour">, ссылка с картинкой сезона, затем .game-location. -->
+    <tr id="tr_tos"><td>
+      <div id="tos" class="has-tooltip"></div>
+      <a href="#" id="hour"><img alt="час" src="symbole/hours/17.png"></a>
+      <a href="#"><img alt="сезон" src="symbole/season1.png"></a>
+      <span class="game-location"><b>Моё местонахождение:</b> <span id="location">Мок-локация</span></span>
+    </td></tr>
+
+    <tr id="tr_sky"><td><div id="sky"></div></td></tr>
+
+    <tr id="tr_field"><td>
+      <div id="cages_overflow"><div id="cages_div" style="opacity: 0.6">
+        <div id="locElementsDiv"></div>
+        <table id="cages"><tbody></tbody></table>
+      </div></div>
+    </td></tr>
+
+    <tr id="tr_info"><td>
+      <table id="info_main"><tbody><tr>
+        <!-- #ist в игре — именно <span> внутри #history_block. -->
+        <td class="infos" id="history"><h2>История</h2><div id="history_block"><span id="ist"></span></div></td>
+        <td class="infos" id="parameter"><h2>Параметры</h2><div id="parameters_skills_block">
+          <div class="parameter" id="hunger"><div class="symbole"></div><div class="bar"><div class="bar-fill" style="transform: scaleX(0.8)"></div><div class="bar-data">Голод: 37%</div></div></div>
+          <div class="skill" id="tree"><div class="symbole"></div><div class="bar has-tooltip" data-original-title="Лазание (5/20)"><div class="bar-fill" style="transform: scaleX(0.2)"></div></div><div class="level">3</div></div>
+        </div></td>
+      </tr></tbody></table>
+    </td></tr>
+  </tbody></table>
+  <div id="black_points">ТБ: <span id="black">0</span></div>
+  <div id="dialog"></div>
+</div>
+
+<div class="mock-panel">
+  <h4>Мок-пульт</h4>
+  <button type="button" id="mock-night">Ночь / день (weather.light)</button>
+  <button type="button" id="mock-history">+ строка в историю</button>
+  <button type="button" id="mock-chat">+ сообщение в чат</button>
+  <button type="button" id="mock-hour">+1 игровой час</button>
+  <button type="button" id="mock-rebuild">Пересобрать поле</button>
+  <div id="mock-status"></div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ * Фейковый Vue 2: реактивности нет, $watch реализован опросом.
+ * Достаточно, чтобы вручную проверять модули без запуска игры.
+ * ------------------------------------------------------------------ */
+(function () {
+  var data = {
+    game: { notReadMess: 0, notReadChat: 0 },
+    chat: { messages: [{ id: 1, text: 'Мок: сообщение чата', volume: 3, cat: 2, login: 'Чужой' }], volume: 3, width: 1000 },
+    cat: { id: 1, login: 'Мок', history: 'Мок: начало истории.<br>', taken: [], black: 0, compactGame: true,
+           gol: 330, zhazhda: 136, son: 0, nuzh: 173, actionMess: '', actionEnds: 0 },
+    family: {},
+    weather: { weather: 0, tos: 12, tosStyle: '', name: 'Тепло', hour: 22, season: 2, sky: 3, light: 0.6 },
+    field: {
+      location: { name: 'Мок-локация', bg: 1 },
+      map: {}, cats: {}, smellMap: null, width: 10, height: 6, nearCats: [], locElements: [],
+    },
+    hunt: { mode: false }, item: { list: [] }, fight: { inFightMode: false }, buff: {},
+    mobile: false,
+    parameter: {
+      level: [0, 1, 5, 20, 50, 200, 500, 1000, 3000, 10000],
+      maximums: { hunger: 900, thirst: 900, dream: 300, need: 450, health: 100, clean: 100 },
+      titles: { hunger: 'Голод', tree: 'Лазание' },
+      data: {
+        hunger: { data: 'Голод: 37%', barWidth: 63 },
+        tree: { level: 3, barWidth: 20, isHidden: false, tooltip: 'Лазание (5/20)' },
+      },
+    },
+    modal: {}, siteClosure: {},
+  };
+
+  for (var y = 1; y <= 6; y++) {
+    data.field.map[y] = {};
+    for (var x = 1; x <= 10; x++) data.field.map[y][x] = { x: x, y: y, cat: null, tree: undefined };
+  }
+  data.field.map[2][3].tree = 4;
+  data.field.map[3][5].tree = -1;
+  data.field.map[4][3].items = [{ id: 11, type: 564 }];
+  data.field.cats = { 1: { id: 1, x: 2, y: 2 } };
+
+  function resolve(path) {
+    return String(path).split('.').reduce(function (acc, p) { return acc == null ? acc : acc[p]; }, data);
+  }
+
+  var watchers = [];
+  setInterval(function () {
+    watchers.forEach(function (w) {
+      var value = resolve(w.path);
+      var snapshot;
+      try { snapshot = JSON.stringify(value); } catch (e) { snapshot = String(value); }
+      if (snapshot !== w.snapshot) {
+        var old = w.snapshot;
+        w.snapshot = snapshot;
+        if (old !== undefined) {
+          var oldVal;
+          try { oldVal = JSON.parse(old); } catch (e) { oldVal = old; }
+          try { w.cb(value, oldVal); } catch (e) { console.error(e); }
+        }
+      }
+    });
+  }, 200);
+
+  var vm = {
+    $data: data,
+    $watch: function (path, cb) {
+      var w = { path: path, cb: cb, snapshot: undefined };
+      try { w.snapshot = JSON.stringify(resolve(path)); } catch (e) { w.snapshot = String(resolve(path)); }
+      watchers.push(w);
+      return function () {
+        var i = watchers.indexOf(w);
+        if (i >= 0) watchers.splice(i, 1);
+      };
+    },
+  };
+  Object.keys(data).forEach(function (k) { vm[k] = data[k]; });
+  document.getElementById('app').__vue__ = vm;
+  window.__mockVm = vm;
+
+  /* ------------------------------ рисуем поле ----------------------------- */
+
+  function buildField() {
+    var tbody = document.querySelector('#cages tbody');
+    tbody.textContent = '';
+    for (var y = 1; y <= 6; y++) {
+      var tr = document.createElement('tr');
+      for (var x = 1; x <= 10; x++) {
+        var td = document.createElement('td');
+        td.className = 'cage';
+        var cage = data.field.map[y][x];
+        var items = document.createElement('div');
+        items.className = 'cage_items';
+        if (typeof cage.tree === 'number' && cage.tree < 0) {
+          items.setAttribute('style', "background-image: url('tree_images/unsafe0.png')");
+        }
+        if (x === 2 && y === 4) {
+          items.setAttribute('style', 'background: url("things/564.png") 0% 0% no-repeat;');
+        }
+        if (cage.items && cage.items.some(function (it) { return it && Number(it.type) === 564; })) {
+          items.setAttribute('style', 'background: url("things/564.png") 0% 0% no-repeat;');
+        }
+        if ((x + y) % 7 === 0) {
+          // В игре переход — <span class="move_parent">.
+          var move = document.createElement('span');
+          move.className = 'move_parent owned';
+          move.innerHTML = '<img class="move_img" alt=""><span class="move_name">переход ' + x + ':' + y + '</span>';
+          items.appendChild(move);
+        }
+        td.appendChild(items);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+  }
+  buildField();
+
+  /* ------------------------ рот: коты и предметы -------------------------- */
+
+  data.item.list = [
+    { id: 9001, type: 5734, eatText: 'Съесть мок-предмет', isActive: true, isLocked: false },
+    { id: 9002, type: 15159, eatText: 'Обнять второй предмет', isActive: false, isLocked: false },
+  ];
+  data.cat.taken = [
+    { id: 8001, login: 'КотВоРту', isActive: true },
+  ];
+  var itemList = document.getElementById('itemList');
+  data.item.list.forEach(function (it) {
+    var d = document.createElement('div');
+    d.id = String(it.id);
+    d.className = 'itemInMouth' + (it.isActive ? ' active_thing' : '');
+    d.innerHTML = '<img alt="">';
+    itemList.appendChild(d);
+  });
+  data.cat.taken.forEach(function (c) {
+    var d = document.createElement('div');
+    d.id = String(c.id);
+    d.className = 'catrot active_thing';
+    itemList.appendChild(d);
+  });
+
+  /* ------------------------ иконки действий (old-icons) ------------------- */
+
+  var akten = document.getElementById('akten');
+  [1, 3, 4, 5, 6, 8, 'exchange', 'flowers'].forEach(function (id) {
+    var a = document.createElement('a');
+    a.className = 'dey';
+    a.setAttribute('data-id', String(id));
+    a.href = '#';
+    a.innerHTML = '<img alt="' + id + '" width="40" height="40" ' +
+      'src="data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\'><rect width=\'40\' height=\'40\' fill=\'%23888\'/></svg>">';
+    akten.appendChild(a);
+  });
+
+  /* --------------------------- синк стейт -> DOM -------------------------- */
+
+  function syncDom() {
+    document.getElementById('cages_div').style.opacity = String(data.weather.light);
+    document.getElementById('ist').innerHTML = data.cat.history;
+    document.getElementById('chat_msg').innerHTML = data.chat.messages
+      .map(function (m) { return '<div class="chat_text">' + m.text + '</div>'; }).join('');
+    document.getElementById('mock-status').textContent =
+      'час ' + data.weather.hour + ', sky ' + data.weather.sky + ', light ' + data.weather.light;
+  }
+  setInterval(syncDom, 250);
+  syncDom();
+
+  /* ------------------------------- кнопки --------------------------------- */
+
+  var LIGHT = [.6,.6,.6,.6,.6,.7,.8,.9,1,1,1,1,1,1,1,1,.9,.8,.7,.6,.6,.6,.6,.6];
+
+  document.getElementById('mock-night').onclick = function () {
+    data.weather.hour = data.weather.light === 1 ? 23 : 12;
+    data.weather.light = LIGHT[data.weather.hour];
+    data.weather.sky = data.weather.light === 1 ? 1 : 3;
+  };
+  document.getElementById('mock-history').onclick = function () {
+    data.cat.history += 'Мок: запись ' + new Date().toLocaleTimeString('ru-RU') + '.<br>';
+  };
+  document.getElementById('mock-chat').onclick = function () {
+    data.chat.messages.unshift({ id: Date.now(), text: 'Мок: новое сообщение ' + data.chat.messages.length, volume: 3, cat: 2, login: 'Чужой' });
+  };
+  var mentionBtn = document.createElement('button');
+  mentionBtn.type = 'button';
+  mentionBtn.textContent = '+ упоминание (myname)';
+  mentionBtn.onclick = function () {
+    data.chat.messages.unshift({ id: Date.now(), text: 'Привет, <span class="myname">Мок</span>!', volume: 3, cat: 2, login: 'Чужой' });
+  };
+  document.querySelector('.mock-panel').insertBefore(mentionBtn, document.getElementById('mock-status'));
+  document.getElementById('mock-hour').onclick = function () {
+    data.weather.hour = (data.weather.hour + 1) % 24;
+    data.weather.light = LIGHT[data.weather.hour];
+  };
+  document.getElementById('mock-rebuild').onclick = buildField;
+
+  // Включить/выключить режим нюха: в игре таблица та же, меняется только
+  // field.smellMap и появляются img.smell_move внутри td.cage.
+  var smellBtn = document.createElement('button');
+  smellBtn.type = 'button';
+  smellBtn.textContent = 'Режим нюха вкл/выкл';
+  smellBtn.onclick = function () {
+    if (data.field.smellMap) {
+      data.field.smellMap = null;
+      Array.prototype.forEach.call(document.querySelectorAll('.smell_move'), function (n) { n.remove(); });
+    } else {
+      data.field.smellMap = [[1, 0, 0], [0, 2, 0]];
+      Array.prototype.forEach.call(document.querySelectorAll('#cages td.cage'), function (td, i) {
+        if (i % 9) return;
+        var img = document.createElement('img');
+        img.className = 'smell_move';
+        img.alt = 'нюх';
+        td.appendChild(img);
+      });
+    }
+  };
+  document.querySelector('.mock-panel').insertBefore(smellBtn, document.getElementById('mock-status'));
+
+  // Без этого роутер решит, что file:// — не игровая страница.
+  window.CWB_FORCE_PAGE = 'game';
+})();
+</script>
+
+<!-- Собранный юзерскрипт. GM_* здесь нет, storage упадёт в localStorage. -->
+<script src="../dist/catwar-balconette.user.js"></script>
+
+</body>
+</html>

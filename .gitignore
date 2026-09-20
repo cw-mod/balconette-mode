@@ -1,0 +1,30 @@
+# зависимости
+node_modules/
+package-lock.json
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# секреты и сессии
+.env
+.env.*
+*.pem
+cookies*
+*cookie*
+
+# HAR, дампы Vue и сохранённые страницы CatWar — в репозиторий не класть
+*.har
+*.HAR
+dump.js
+catwar-dump*.json
+*dump*.json
+research/
+
+# сохранёнки игровых страниц и их _files
+Игровая*
+Об игре*
+*_files/
+
+# прочее
+*.log

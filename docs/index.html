@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CatWar Balconette</title>
+  <style>
+    :root { color-scheme: dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: #f3e4c8;
+      background: #1c140c;
+    }
+    main { max-width: 42rem; }
+    h1 { margin: 0 0 12px; font-size: 1.6rem; line-height: 1.25; }
+    h2 { margin: 28px 0 10px; font-size: 1.15rem; }
+    p { margin: 0 0 12px; }
+    .downloads {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 8px 0 8px;
+    }
+    .download {
+      display: inline-block;
+      padding: 12px 18px;
+      font-weight: 700;
+      color: #1c140c;
+      text-decoration: none;
+      background: #f3e4c8;
+      border-radius: 8px;
+    }
+    .download:hover { background: #fff; }
+    .note { font-size: 0.92rem; opacity: 0.88; }
+    ol, ul { margin: 0 0 12px; padding-left: 1.2em; }
+    li { margin-bottom: 6px; }
+    code { font-size: 0.9em; }
+    a { color: #f3e4c8; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>CatWar Balconette</h1>
+    <p>Модульный юзерскрипт для игровой <a href="https://catwar.su/cw3/">CatWar</a>: сетка, поле для ЛУ, ID во рту, звуки, часы и другие улучшения. Каждый модуль включается отдельно в одной панели.</p>
+    <p class="downloads">
+      <a class="download" href="./catwar-balconette.user.js">Установить в Tampermonkey</a>
+    </p>
+    <p class="note">Версия 0.1.2 Автообновление: <a href="./catwar-balconette.meta.js">catwar-balconette.meta.js</a>. Исходники: <a href="https://github.com/cw-mod/balconette-mode">github.com/cw-mod/balconette-mode</a>.</p>
+
+    <h2>Установка</h2>
+    <ol>
+      <li>Установите <a href="https://www.tampermonkey.net/" rel="noopener">Tampermonkey</a>.</li>
+      <li>Нажмите «Установить в Tampermonkey» — расширение предложит добавить скрипт.</li>
+      <li><strong>Отключите</strong> старые моды: CW Shed, CatWar UwU, CW Mod. Вместе с ними чат и поле ломаются.</li>
+      <li>Откройте игровую <code>https://catwar.su/cw3/</code>. В углу появится кнопка «⚙ моды» (или Ctrl+Alt+B).</li>
+    </ol>
+    <p class="note">После установки Tampermonkey сам проверяет обновления с этой страницы. Проверить вручную: Tampermonkey → Balconette → «Проверить обновления».</p>
+  </main>
+</body>
+</html>
