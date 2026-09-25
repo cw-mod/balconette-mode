@@ -344,6 +344,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(400);
   check('climbing-field: системное без [треск] не ставит цифру',
     !!(luCatCell && luCatCell.textContent === '3'), luCatBefore);
+  vm.chat.messages.unshift({
+    id: 2004, text: '[треск]', login: 'ветвь Небесного дуба', volume: 6, mute: 1, cat: 1,
+  });
+  await sleep(400);
+  check('climbing-field: volume 6 остаётся шестёркой',
+    !!(luCatCell && luCatCell.textContent === '6'), luCatCell && luCatCell.textContent);
+  var errorEl = window.document.getElementById('error');
+  if (errorEl) {
+    errorEl.textContent = 'Я слышу очень громкий треск.';
+    await sleep(200);
+  }
+  check('climbing-field: тост «очень громкий» не затирает 6 пятёркой',
+    !!(luCatCell && luCatCell.textContent === '6'), luCatCell && luCatCell.textContent);
 
   var luEmpty = window.document.querySelector('#cwb-lu-grid td[data-i="0"]');
   if (luEmpty) {

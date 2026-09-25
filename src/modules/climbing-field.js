@@ -110,9 +110,10 @@ function fillKind(mark) {
 }
 
 /**
- * Треск в чате (HAR «хожу по лазалке», 2026-09-20):
- *   42["msg", { text: "[треск]", login: "ветвь …", mute: 1, volume: 1..5 }]
- * Параллельный тост 42["info","Я слышу … треск."] — те же громкости.
+ * Треск в чате:
+ *   42["msg", { text: "[треск]", login: "ветвь …", mute: 1, volume: 0..7 }]
+ * Цифра — только msg.volume. Тост 42["info","Я слышу …"] дублирует звук, но
+ * «очень громкий» общий у volume 5 и 6, поэтому из текста его не мапим.
  * Не берём любые системные реплики и не берём «оглушительный» без volume.
  */
 function crackMarkFromChat(msg) {
@@ -121,12 +122,14 @@ function crackMarkFromChat(msg) {
   var isBracket = /\[треск\]/i.test(text);
   var isHear = /^я слышу\s+.+\s+треск/i.test(text.trim());
   if (!isBracket && !isHear) return '';
-  var vol = Number(msg.volume);
-  if (!isNaN(vol) && vol >= 0 && vol <= 7) return String(vol);
+  if (msg.volume != null && msg.volume !== '') {
+    var vol = Number(msg.volume);
+    if (!isNaN(vol) && vol >= 0 && vol <= 7) return String(vol);
+  }
   var t = text.toLowerCase();
   if (/оглушительн/.test(t)) return '';
+  if (/очень громк/.test(t)) return '';
   if (/едва различим/.test(t)) return '1';
-  if (/очень громк/.test(t)) return '5';
   if (/приглуш[её]нн/.test(t)) return '3';
   if (/тихий/.test(t)) return '2';
   if (/громк/.test(t)) return '4';
@@ -504,11 +507,11 @@ module.exports = {
       setMark(i, value);
     }
 
-    function applyCrackNow(mark) {
+    function applyCrackNow(mark, overwrite) {
       if (!mark || !ctx.settings.get('autoFromChat')) return;
       var pos = myPos();
       if (!pos) return;
-      applyToCell(pos.x, pos.y, mark, true);
+      applyToCell(pos.x, pos.y, mark, overwrite !== false);
     }
 
     function ingestChatMsg(msg) {
@@ -541,7 +544,7 @@ module.exports = {
       if (!text || text === lastErrorText) return;
       lastErrorText = text;
       var mark = crackMarkFromChat({ text: text });
-      if (mark) applyCrackNow(mark);
+      if (mark) applyCrackNow(mark, false);
     }
 
     function fillFromServer() {
@@ -771,7 +774,7 @@ module.exports = {
       ctx.addCleanup(socket.on('info', function (payload) {
         if (ctx.isDisposed()) return;
         var mark = crackMarkFromChat({ text: String(payload || '') });
-        if (mark) applyCrackNow(mark);
+        if (mark) applyCrackNow(mark, false);
       }));
       ctx.addCleanup(socket.on('tree cage', function (t) {
         if (ctx.isDisposed() || !t) return;
