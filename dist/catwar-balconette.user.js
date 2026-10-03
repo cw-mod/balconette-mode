@@ -2,7 +2,7 @@
 // @name         CatWar Balconette
 // @name:ru      CatWar Balconette
 // @namespace    catwar-balconette
-// @version      0.1.3
+// @version      0.1.4
 // @description  Модульный набор улучшений для CatWar: настройки в одной панели, каждый модуль включается и выключается на лету.
 // @description:ru Модульный набор улучшений для CatWar: настройки в одной панели, каждый модуль включается и выключается на лету.
 // @author       balconette
@@ -30,8 +30,8 @@
 (function () {
   'use strict';
 
-  var CWB_VERSION = "0.1.3";
-  var CWB_MODULE_IDS = ["action-title","always-day","cell-coords","climbing-field","clock","copy-id","grid","hide-weather","highlight-moves","history-autoscroll","hunt-smell-square","layout-swap","mouth-cat-ids","mouth-item-ids","notifications","old-icons","param-info","pm-ids","skill-fractions","sounds","static-background"];
+  var CWB_VERSION = "0.1.4";
+  var CWB_MODULE_IDS = ["action-title","always-day","cell-coords","climbing-field","clock","copy-id","grid","hide-cat-tooltip","hide-weather","highlight-moves","history-autoscroll","hunt-smell-square","layout-swap","mouth-cat-ids","mouth-item-ids","notifications","old-icons","param-info","pm-ids","skill-fractions","sounds","static-background"];
 
   var __factories = Object.create(null);
   var __cache = Object.create(null);
@@ -1491,6 +1491,15 @@
         '.cwb-opt-val{font-size:12px;color:#8a7f70;min-width:34px;}',
         '.cwb-opt-full{flex-direction:column;align-items:stretch;}',
 
+        '.cwb-maps-editor{display:flex;flex-direction:column;gap:8px;width:100%;}',
+        '.cwb-maps-editor h4{margin:4px 0 0;font-size:12px;}',
+        '.cwb-maps-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}',
+        '.cwb-maps-item{display:flex;align-items:center;gap:2px;}',
+        '.cwb-maps-item button,.cwb-maps-row>.cwb-btn{min-height:24px;padding:2px 7px;border:1px solid #d6cbb8;',
+        'border-radius:6px;background:#fff;cursor:pointer;font:inherit;font-size:12px;color:inherit;}',
+        '.cwb-maps-item button.active{background:#e8c27a;border-color:#e8c27a;color:#2a1f12;}',
+        '.cwb-maps-item .cwb-maps-ico{min-width:24px;padding:2px 5px;opacity:.8;}',
+
         '.cwb-foot{flex:0 0 auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;',
         'padding:10px 14px;border-top:1px solid #e6ddcd;background:#f5f0e6;}',
         '.cwb-btn{padding:6px 12px;border:1px solid #d6cbb8;border-radius:7px;background:#fff;cursor:pointer;',
@@ -1570,13 +1579,28 @@
         return node;
       }
 
+      if (type === 'custom' && typeof schemaItem.render === 'function') {
+        return schemaItem.render(current, apply, schemaItem) || document.createTextNode('');
+      }
+
       node = dom.el('input', { type: 'text', value: current === undefined || current === null ? '' : String(current), placeholder: schemaItem.placeholder || '' });
       node.addEventListener('change', function (e) { apply(e.target.value); });
       return node;
     }
 
     function optionRow(schemaItem, current, apply) {
-      var full = schemaItem.type === 'textarea';
+      var full = schemaItem.type === 'textarea' || schemaItem.type === 'custom';
+      if (schemaItem.type === 'custom') {
+        return dom.el('div', { class: 'cwb-opt cwb-opt-full' }, [
+          schemaItem.label || schemaItem.hint
+            ? dom.el('label', { class: 'cwb-opt-label' }, [
+              schemaItem.label ? document.createTextNode(schemaItem.label) : null,
+              schemaItem.hint ? dom.el('span', { class: 'cwb-opt-hint', text: schemaItem.hint }) : null,
+            ])
+            : null,
+          control(schemaItem, current, apply),
+        ]);
+      }
       return dom.el('div', { class: 'cwb-opt' + (full ? ' cwb-opt-full' : '') }, [
         dom.el('label', { class: 'cwb-opt-label' }, [
           document.createTextNode(schemaItem.label || schemaItem.key),
@@ -2526,11 +2550,14 @@
     /**
      * Поле для лазательных умений («минное поле»).
      *
-     * Как в UwU / Shed: сетка 10×6, вкладки ярусов, цифры 0–7 = громкость треска,
-     * X = мина, = = переход. Карты хранятся в cwb:climbing-maps и не сбрасываются
-     * при обновлении страницы. Опаска things/564.png на .cage_items ставит X сама.
+     * Как в UwU / Shed: сетка 10×6, вкладки и поля/локации внутри вкладки,
+     * цифры 0–7 = громкость треска, X = мина, = = переход. Карты в cwb:climbing-maps
+     * и не сбрасываются при обновлении страницы. Опаска things/564.png на
+     * .cage_items ставит X сама.
      * Плюс: дублируем пометки на клетках #cages и автоматически ставим цифру
      * в клетку, где стоит кот (громкость из чата или ярус field.map[y][x].tree).
+     * Режим «Кач ЛУ» глушит клик по опасным клеткам на игровом поле
+     * (мина / tree<0 / tree_images/unsafe / опаска 564). Обычный ход не трогаем.
      *
      * Не считает шанс залезть. Не пишет в Vue-стейт. Не трогает чат-DOM.
      */
@@ -2542,8 +2569,10 @@
     var COLS = 10;
     var STORAGE_KEY = 'climbing-maps';
     var LEGACY_KEY = 'climbing-grid';
-    var DEFAULT_TABS = 6;
+    var DEFAULT_TAB_NAMES = ['Вкладка 1', 'Вкладка 2'];
+    var DEFAULT_FIELDS = 5;
     var MAX_TABS = 24;
+    var MAX_FIELDS = 24;
     var UNSAFE_RE = /tree_images\/unsafe/i;
     /** Моргающая опаска на поле — предмет things/564.png на .cage_items (сохранёнка «опаска»). */
     var DANGER_THING_RE = /things\/564(?:\.png)?/i;
@@ -2567,39 +2596,195 @@
     }
 
     function normalizeGrid(raw) {
+      if (Array.isArray(raw) && raw.length === ROWS && Array.isArray(raw[0])) {
+        var flat = [];
+        for (var y = 0; y < ROWS; y++) {
+          for (var x = 0; x < COLS; x++) {
+            var cell = raw[y] && raw[y][x];
+            var v = cell && typeof cell === 'object' ? cell.value : cell;
+            flat.push(typeof v === 'string' ? v : '');
+          }
+        }
+        return flat;
+      }
       if (!Array.isArray(raw) || raw.length !== ROWS * COLS) return emptyGrid();
       return raw.map(function (v) { return typeof v === 'string' ? v : ''; });
     }
 
+    function emptyTable(name) {
+      return { name: name || 'Поле 1', grid: emptyGrid() };
+    }
+
+    function emptyTab(name, fieldCount) {
+      var n = fieldCount == null ? DEFAULT_FIELDS : fieldCount;
+      var tables = [];
+      for (var i = 0; i < n; i++) tables.push(emptyTable('Поле ' + (i + 1)));
+      return { name: name || 'Вкладка 1', currentTable: 0, tables: tables };
+    }
+
     function defaultMaps() {
-      var tabs = [];
-      for (var i = 0; i < DEFAULT_TABS; i++) {
-        tabs.push({ name: 'Ярус ' + (i + 1), grid: emptyGrid() });
+      return {
+        version: 2,
+        currentTab: 0,
+        tabs: DEFAULT_TAB_NAMES.map(function (name) { return emptyTab(name, DEFAULT_FIELDS); }),
+      };
+    }
+
+    function normalizeTab(tab, i) {
+      if (!tab || typeof tab !== 'object') return emptyTab('Вкладка ' + (i + 1), 1);
+      var name = String(tab.name || ('Вкладка ' + (i + 1)));
+      var tables = [];
+      if (Array.isArray(tab.tables) && tab.tables.length) {
+        tab.tables.forEach(function (t, j) {
+          if (!t || typeof t !== 'object') {
+            tables.push(emptyTable('Поле ' + (j + 1)));
+            return;
+          }
+          tables.push({
+            name: String(t.name || ('Поле ' + (j + 1))),
+            grid: normalizeGrid(t.grid || t.data),
+          });
+        });
+      } else {
+        tables.push({ name: 'Поле 1', grid: normalizeGrid(tab.grid) });
       }
-      return { version: 1, current: 0, tabs: tabs };
+      var currentTable = typeof tab.currentTable === 'number' ? tab.currentTable
+        : typeof tab.currentTableId === 'number' ? tab.currentTableId : 0;
+      if (currentTable < 0 || currentTable >= tables.length) currentTable = 0;
+      return { name: name, currentTable: currentTable, tables: tables };
+    }
+
+    function normalizeMaps(raw) {
+      if (!raw || !Array.isArray(raw.tabs) || !raw.tabs.length) return defaultMaps();
+      var tabs = raw.tabs.map(normalizeTab);
+      var currentTab = typeof raw.currentTab === 'number' ? raw.currentTab
+        : typeof raw.current === 'number' ? raw.current
+          : typeof raw.currentTabIndex === 'number' ? raw.currentTabIndex : 0;
+      if (currentTab < 0 || currentTab >= tabs.length) currentTab = 0;
+      return { version: 2, currentTab: currentTab, tabs: tabs };
     }
 
     function loadMaps(storage) {
       var raw = storage.get(STORAGE_KEY, null);
-      if (raw && Array.isArray(raw.tabs) && raw.tabs.length) {
-        raw.tabs.forEach(function (tab, i) {
-          if (!tab || typeof tab !== 'object') raw.tabs[i] = { name: 'Ярус ' + (i + 1), grid: emptyGrid() };
-          else {
-            tab.name = String(tab.name || ('Ярус ' + (i + 1)));
-            tab.grid = normalizeGrid(tab.grid);
-          }
-        });
-        if (typeof raw.current !== 'number' || raw.current < 0 || raw.current >= raw.tabs.length) raw.current = 0;
-        raw.version = 1;
-        return raw;
-      }
+      if (raw && Array.isArray(raw.tabs) && raw.tabs.length) return normalizeMaps(raw);
       var maps = defaultMaps();
       var legacy = storage.get(LEGACY_KEY, null);
       if (Array.isArray(legacy) && legacy.length === ROWS * COLS) {
-        maps.tabs[0].grid = normalizeGrid(legacy);
+        maps.tabs[0].tables[0].grid = normalizeGrid(legacy);
         storage.set(STORAGE_KEY, maps);
       }
       return maps;
+    }
+
+    function clipName(value, fallback) {
+      var next = String(value == null ? '' : value).trim();
+      if (!next) return fallback;
+      return next.slice(0, 32);
+    }
+
+    /** Редактор вкладок и полей — как tabManager в UwU на странице настроек. */
+    function renderMapsEditor() {
+      var storage = require('core/storage');
+      var wrap = dom.el('div', { class: 'cwb-maps-editor' });
+
+      function persist(maps) {
+        storage.set(STORAGE_KEY, maps);
+        draw();
+      }
+
+      function ask(message, initial) {
+        var raw = window.prompt(message, initial == null ? '' : initial);
+        if (raw == null) return null;
+        return clipName(raw, '');
+      }
+
+      function draw() {
+        var maps = normalizeMaps(storage.get(STORAGE_KEY, null));
+        wrap.textContent = '';
+        wrap.appendChild(dom.el('h4', { text: 'Вкладки' }));
+        var tabRow = dom.el('div', { class: 'cwb-maps-row' });
+        maps.tabs.forEach(function (tab, i) {
+          var nameBtn = dom.el('button', {
+            type: 'button',
+            class: i === maps.currentTab ? 'active' : '',
+            text: tab.name,
+          });
+          nameBtn.addEventListener('click', function () {
+            maps.currentTab = i;
+            persist(maps);
+          });
+          var renameBtn = dom.el('button', { type: 'button', class: 'cwb-maps-ico', text: '✎', title: 'Переименовать вкладку' });
+          renameBtn.addEventListener('click', function () {
+            var next = ask('Введите новое имя вкладки:', tab.name);
+            if (!next) return;
+            maps.tabs[i].name = next;
+            persist(maps);
+          });
+          var delBtn = dom.el('button', { type: 'button', class: 'cwb-maps-ico', text: 'X', title: 'Удалить вкладку' });
+          delBtn.addEventListener('click', function () {
+            maps.tabs.splice(i, 1);
+            if (maps.currentTab >= maps.tabs.length) maps.currentTab = Math.max(0, maps.tabs.length - 1);
+            persist(maps);
+          });
+          tabRow.appendChild(dom.el('div', { class: 'cwb-maps-item' }, [nameBtn, renameBtn, delBtn]));
+        });
+        var addTab = dom.el('button', { type: 'button', class: 'cwb-btn', text: '+' });
+        addTab.addEventListener('click', function () {
+          if (maps.tabs.length >= MAX_TABS) return;
+          var name = ask('Введите имя вкладки:');
+          if (!name) return;
+          maps.tabs.push(emptyTab(name, 0));
+          maps.currentTab = maps.tabs.length - 1;
+          persist(maps);
+        });
+        tabRow.appendChild(addTab);
+        wrap.appendChild(tabRow);
+
+        wrap.appendChild(dom.el('h4', { text: 'Локации / Таблицы' }));
+        var fieldRow = dom.el('div', { class: 'cwb-maps-row' });
+        var tab = maps.tabs[maps.currentTab];
+        if (tab) {
+          tab.tables.forEach(function (table, i) {
+            var nameBtn = dom.el('button', {
+              type: 'button',
+              class: i === tab.currentTable ? 'active' : '',
+              text: table.name,
+            });
+            nameBtn.addEventListener('click', function () {
+              tab.currentTable = i;
+              persist(maps);
+            });
+            var renameBtn = dom.el('button', { type: 'button', class: 'cwb-maps-ico', text: '✎', title: 'Переименовать поле' });
+            renameBtn.addEventListener('click', function () {
+              var next = ask('Введите новое имя поля:', table.name);
+              if (!next) return;
+              tab.tables[i].name = next;
+              persist(maps);
+            });
+            var delBtn = dom.el('button', { type: 'button', class: 'cwb-maps-ico', text: 'X', title: 'Удалить поле' });
+            delBtn.addEventListener('click', function () {
+              tab.tables.splice(i, 1);
+              if (tab.currentTable >= tab.tables.length) tab.currentTable = Math.max(0, tab.tables.length - 1);
+              persist(maps);
+            });
+            fieldRow.appendChild(dom.el('div', { class: 'cwb-maps-item' }, [nameBtn, renameBtn, delBtn]));
+          });
+          var addField = dom.el('button', { type: 'button', class: 'cwb-btn', text: '+' });
+          addField.addEventListener('click', function () {
+            if (tab.tables.length >= MAX_FIELDS) return;
+            var name = ask('Введите имя поля:');
+            if (!name) return;
+            tab.tables.push(emptyTable(name));
+            tab.currentTable = tab.tables.length - 1;
+            persist(maps);
+          });
+          fieldRow.appendChild(addField);
+        }
+        wrap.appendChild(fieldRow);
+      }
+
+      draw();
+      return wrap;
     }
 
     function idx(x, y) { return (y - 1) * COLS + (x - 1); }
@@ -2714,7 +2899,7 @@
     module.exports = {
       id: 'climbing-field',
       title: 'Поле для ЛУ',
-      description: 'Минное поле 10×6 с вкладками ярусов: цифры треска, мины и переходы. Карты сохраняются между обновлениями.',
+      description: 'Минное поле 10×6 со вкладками и полями-локациями: цифры треска, мины и переходы. Карты сохраняются между обновлениями.',
       category: 'field',
       pages: ['game'],
       enabledByDefault: false,
@@ -2725,6 +2910,7 @@
         autoFromServer: true,
         autoFromChat: true,
         showSkill: true,
+        blockDangerous: true,
         collapsed: false,
         x: null,
         y: null,
@@ -2733,6 +2919,12 @@
 
       schema: [
         { key: 'overlay', type: 'boolean', label: 'Дублировать пометки на игровом поле' },
+        {
+          key: 'blockDangerous',
+          type: 'boolean',
+          label: 'Кач ЛУ: не нажимать на опасные клетки',
+          hint: 'Глушит клик по минам, опаскам и unsafe. Выключите, чтобы ходить как обычно.',
+        },
         {
           key: 'autoFromServer',
           type: 'boolean',
@@ -2753,45 +2945,60 @@
         {
           key: 'clearOnLocation',
           type: 'boolean',
-          label: 'Очищать текущую вкладку при смене локации',
-          hint: 'По умолчанию выключено: карты хранятся во вкладках «Ярус 1…» и переживают обновление страницы.',
+          label: 'Очищать текущее поле при смене локации',
+          hint: 'По умолчанию выключено: карты хранятся во вкладках и полях и переживают обновление страницы.',
+        },
+        {
+          key: 'mapsEditor',
+          type: 'custom',
+          label: 'Вкладки и поля',
+          hint: 'Добавить, удалить или переименовать вкладки и таблицы-поля внутри выбранной вкладки.',
+          render: renderMapsEditor,
         },
       ],
 
       styles: function () {
         return [
-          '#cwb-lu{position:fixed;z-index:2147482500;min-width:220px;background:rgba(32,28,24,.94);',
+          '#cwb-lu{position:fixed;z-index:2147482500;width:260px;box-sizing:border-box;background:rgba(32,28,24,.94);',
           'color:#f3e7d3;border:1px solid #5a4e3e;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.4);',
           'font:12px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;user-select:none;}',
           '#cwb-lu-head{display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:move;',
           'background:#3a332b;border-radius:10px 10px 0 0;}',
-          '#cwb-lu-head strong{flex:1;font-size:13px;}',
-          '#cwb-lu-skill{opacity:.75;font-size:11px;}',
+          '#cwb-lu-head strong{flex:1;min-width:0;font-size:13px;}',
+          '#cwb-lu-skill{opacity:.75;font-size:11px;max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
           '#cwb-lu-fold{background:none;border:none;color:#f3e7d3;cursor:pointer;font-size:16px;padding:0 4px;}',
-          '#cwb-lu-body{padding:8px;}',
+          '#cwb-lu-body{padding:5px;}',
           '#cwb-lu-body[hidden]{display:none;}',
-          '#cwb-lu-grid{border-collapse:collapse;margin:0 auto;}',
-          '#cwb-lu-grid td{position:relative;width:22px;height:22px;border:1px solid #6a5d4c;text-align:center;',
-          'font:700 12px/22px ui-monospace,Menlo,Consolas,monospace;cursor:pointer;background:#2a241e;}',
+          '#cwb-lu-grid{border-collapse:collapse;margin:0 auto;table-layout:fixed;width:250px;height:190px;}',
+          '#cwb-lu-grid td{position:relative;width:10%;height:calc(100% / 6);padding:0;box-sizing:border-box;',
+          'border:1px solid #6a5d4c;text-align:center;',
+          'font:700 12px/1 ui-monospace,Menlo,Consolas,monospace;cursor:pointer;background:#2a241e;}',
           '#cwb-lu-grid td:focus{outline:2px solid #e8c27a;outline-offset:-2px;}',
           '#cwb-lu-grid td[data-cwb-here]{box-shadow:inset 0 0 0 2px #e8c27a;}',
           '#cwb-lu-grid td[data-cwb-here]::before{content:"";position:absolute;left:1px;top:1px;width:5px;height:5px;',
           'border-radius:50%;background:#e8c27a;pointer-events:none;z-index:1;}',
           '#cwb-lu-help{margin-top:6px;font-size:11px;opacity:.7;}',
-          '#cwb-lu-tabs{display:flex;flex-wrap:wrap;gap:3px;margin:0 0 6px;align-items:center;}',
-          '#cwb-lu-tabs button{min-width:22px;height:20px;padding:0 6px;border:1px solid #6a5d4c;',
+          '#cwb-lu-nav h3{margin:4px 0 3px;font-size:12px;font-weight:700;}',
+          '#cwb-lu-nav h3:first-child{margin-top:0;}',
+          '#cwb-lu-tabs,#cwb-lu-fields{display:flex;flex-wrap:wrap;gap:3px;margin:0 0 6px;align-items:center;}',
+          '#cwb-lu-tabs button,#cwb-lu-fields button{min-width:22px;height:20px;padding:0 6px;border:1px solid #6a5d4c;',
           'border-radius:4px;background:#2a241e;color:#f3e7d3;cursor:pointer;font:11px/18px inherit;}',
-          '#cwb-lu-tabs button.active{background:#e8c27a;color:#2a1f12;border-color:#e8c27a;}',
-          '#cwb-lu-tabs .cwb-lu-tab-add,#cwb-lu-tabs .cwb-lu-tab-del{opacity:.8;}',
+          '#cwb-lu-tabs button.active,#cwb-lu-fields button.active{background:#e8c27a;color:#2a1f12;border-color:#e8c27a;}',
+          '#cwb-lu-empty{text-align:center;margin:12px 0;opacity:.8;}',
+          '#cwb-lu-grid[hidden],#cwb-lu-tools[hidden],#cwb-lu-empty[hidden]{display:none;}',
+          '#cwb-lu-train{display:block;width:100%;margin:6px 0 0;height:22px;padding:0 6px;border:1px solid #6a5d4c;',
+          'border-radius:4px;background:#3a332b;color:#f3e7d3;cursor:pointer;font:11px/20px inherit;}',
+          '#cwb-lu-train.active{background:#e8c27a;color:#2a1f12;border-color:#e8c27a;}',
           '#cwb-lu-tools{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;}',
           '#cwb-lu-tools button{min-width:22px;height:20px;padding:0 5px;border:1px solid #6a5d4c;',
           'border-radius:4px;background:#3a332b;color:#f3e7d3;cursor:pointer;font:11px/18px inherit;}',
-          '#cages td.cage{position:relative;}',
+          '#cages td.cage{position:relative;width:100px;}',
           '#cages td.cage[data-cwb-lu-fill]::before{content:"";position:absolute;left:0;top:0;right:0;bottom:0;',
           'z-index:5;pointer-events:none;}',
           '#cages td.cage[data-cwb-lu-fill="safe"]::before{background:rgba(46,130,50,.28);}',
           '#cages td.cage[data-cwb-lu-fill="mine"]::before{background:rgba(180,16,16,.32);}',
           '#cages td.cage[data-cwb-lu-fill="transit"]::before{background:rgba(255,236,140,.3);}',
+          '#cages td.cage[data-cwb-lu-block]{cursor:not-allowed;}',
           '#cages td.cage[data-cwb-lu]::after{content:attr(data-cwb-lu);position:absolute;right:2px;bottom:2px;',
           'z-index:40;font:700 12px/1 ui-monospace,Menlo,Consolas,monospace;padding:1px 3px;border-radius:3px;',
           'background:rgba(0,0,0,.78);color:#ffe9a8;pointer-events:none;}',
@@ -2809,11 +3016,28 @@
         var lastErrorText = '';
         var lastLoc = null;
 
+        function currentTab() {
+          if (!maps.tabs.length) return null;
+          if (maps.currentTab < 0 || maps.currentTab >= maps.tabs.length) maps.currentTab = 0;
+          return maps.tabs[maps.currentTab];
+        }
+
+        function currentTable() {
+          var tab = currentTab();
+          if (!tab || !tab.tables.length) return null;
+          if (tab.currentTable < 0 || tab.currentTable >= tab.tables.length) tab.currentTable = 0;
+          return tab.tables[tab.currentTable];
+        }
+
         function currentGrid() {
-          if (!maps.tabs.length) maps.tabs = defaultMaps().tabs;
-          if (maps.current < 0 || maps.current >= maps.tabs.length) maps.current = 0;
-          if (!maps.tabs[maps.current].grid) maps.tabs[maps.current].grid = emptyGrid();
-          return maps.tabs[maps.current].grid;
+          var cur = currentTable();
+          if (!cur) return emptyGrid();
+          if (!cur.grid) cur.grid = emptyGrid();
+          return cur.grid;
+        }
+
+        function hasCurrentField() {
+          return !!currentTable();
         }
 
         var skillEl = dom.el('span', { id: 'cwb-lu-skill' });
@@ -2841,16 +3065,32 @@
         }
 
         var tabsEl = dom.el('div', { id: 'cwb-lu-tabs' });
+        var fieldsEl = dom.el('div', { id: 'cwb-lu-fields' });
+        var nav = dom.el('div', { id: 'cwb-lu-nav' }, [
+          dom.el('h3', { text: 'Вкладка' }),
+          tabsEl,
+          dom.el('h3', { text: 'Локация' }),
+          fieldsEl,
+        ]);
+        var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавьте поле/таблицу в настройках' });
+        var trainBtn = dom.el('button', {
+          type: 'button',
+          id: 'cwb-lu-train',
+          text: 'Кач ЛУ',
+          title: 'В каче ЛУ не нажимать на опасные клетки',
+        });
         var tools = dom.el('div', { id: 'cwb-lu-tools' });
         ['0', '1', '2', '3', '4', '5', '6', '7', 'X', '=', 'очистить'].forEach(function (label) {
           tools.appendChild(dom.el('button', { type: 'button', 'data-mark': label, text: label }));
         });
 
         var body = dom.el('div', { id: 'cwb-lu-body' }, [
-          tabsEl,
+          nav,
+          emptyEl,
           table,
+          trainBtn,
           tools,
-          dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки — разные ярусы, карта не сбрасывается при обновлении.' }),
+          dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки и поля настраиваются в панели модов. «Кач ЛУ» глушит клик по опасным клеткам на поле.' }),
         ]);
 
         var panel = dom.el('div', { id: 'cwb-lu' }, [head, body]);
@@ -2913,11 +3153,34 @@
         function clearFieldMarks(td) {
           delete td.dataset.cwbLu;
           delete td.dataset.cwbLuFill;
+          delete td.dataset.cwbLuBlock;
+        }
+
+        function cellIsDangerous(td, c) {
+          if (!c) c = cellCoords(td);
+          if (!c || c.x < 1 || c.x > COLS || c.y < 1 || c.y > ROWS) return false;
+          if (currentGrid()[idx(c.x, c.y)] === 'mine') return true;
+          var map = ctx.vue.get('field.map');
+          var cage = map && map[c.y] && map[c.y][c.x];
+          return cellLooksUnsafe(td, cage);
+        }
+
+        function paintTrain() {
+          var on = !!ctx.settings.get('blockDangerous');
+          trainBtn.classList.toggle('active', on);
+          trainBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          trainBtn.title = on
+            ? 'Кач ЛУ включён: клик по опасным клеткам заблокирован'
+            : 'Кач ЛУ выключен: обычное передвижение';
         }
 
         function paintField() {
+          paintTrain();
           var tds = ctx.dom.qsa('#cages td.cage');
-          if (!ctx.settings.get('overlay') || fieldHidden()) {
+          var hidden = fieldHidden();
+          var overlayOn = ctx.settings.get('overlay') && !hidden;
+          var blockOn = ctx.settings.get('blockDangerous') && !hidden;
+          if (!overlayOn && !blockOn) {
             tds.forEach(clearFieldMarks);
             return;
           }
@@ -2928,12 +3191,15 @@
               return;
             }
             var mark = currentGrid()[idx(c.x, c.y)];
-            if (!mark) {
-              clearFieldMarks(td);
-              return;
+            if (overlayOn && mark) {
+              td.dataset.cwbLu = labelOf(mark);
+              td.dataset.cwbLuFill = fillKind(mark);
+            } else {
+              delete td.dataset.cwbLu;
+              delete td.dataset.cwbLuFill;
             }
-            td.dataset.cwbLu = labelOf(mark);
-            td.dataset.cwbLuFill = fillKind(mark);
+            if (blockOn && cellIsDangerous(td, c)) td.dataset.cwbLuBlock = '1';
+            else delete td.dataset.cwbLuBlock;
           });
         }
 
@@ -2946,73 +3212,53 @@
           skillEl.textContent = 'ЛУ ' + (d.level != null ? d.level : '?') + (m ? ' · ' + m[1] : '');
         }
 
-        function paintTabs() {
+        function paintNav() {
           tabsEl.textContent = '';
+          fieldsEl.textContent = '';
           maps.tabs.forEach(function (tab, i) {
             var btn = dom.el('button', {
               type: 'button',
               'data-tab': String(i),
-              text: tab.name || ('Ярус ' + (i + 1)),
-              title: 'Двойной клик — переименовать',
+              text: tab.name || ('Вкладка ' + (i + 1)),
             });
-            if (i === maps.current) btn.className = 'active';
+            if (i === maps.currentTab) btn.className = 'active';
             tabsEl.appendChild(btn);
           });
-          tabsEl.appendChild(dom.el('button', {
-            type: 'button',
-            className: 'cwb-lu-tab-add',
-            'data-tab-act': 'add',
-            text: '+',
-            title: 'Новый ярус',
-          }));
-          if (maps.tabs.length > 1) {
-            tabsEl.appendChild(dom.el('button', {
-              type: 'button',
-              className: 'cwb-lu-tab-del',
-              'data-tab-act': 'del',
-              text: '×',
-              title: 'Удалить текущий ярус',
-            }));
+          var tab = currentTab();
+          if (tab) {
+            tab.tables.forEach(function (field, i) {
+              var btn = dom.el('button', {
+                type: 'button',
+                'data-field': String(i),
+                text: field.name || ('Поле ' + (i + 1)),
+              });
+              if (i === tab.currentTable) btn.className = 'active';
+              fieldsEl.appendChild(btn);
+            });
           }
+          var ready = hasCurrentField();
+          emptyEl.hidden = ready;
+          table.hidden = !ready;
+          tools.hidden = !ready;
         }
 
         function switchTab(i) {
           if (typeof i !== 'number' || i < 0 || i >= maps.tabs.length) return;
-          maps.current = i;
+          maps.currentTab = i;
           save();
           paintAll();
         }
 
-        function addTab() {
-          if (maps.tabs.length >= MAX_TABS) return;
-          maps.tabs.push({ name: 'Ярус ' + (maps.tabs.length + 1), grid: emptyGrid() });
-          maps.current = maps.tabs.length - 1;
+        function switchField(i) {
+          var tab = currentTab();
+          if (!tab || typeof i !== 'number' || i < 0 || i >= tab.tables.length) return;
+          tab.currentTable = i;
           save();
           paintAll();
-        }
-
-        function deleteTab() {
-          if (maps.tabs.length <= 1) return;
-          maps.tabs.splice(maps.current, 1);
-          if (maps.current >= maps.tabs.length) maps.current = maps.tabs.length - 1;
-          save();
-          paintAll();
-        }
-
-        function renameTab(i) {
-          var tab = maps.tabs[i];
-          if (!tab) return;
-          var next = window.prompt('Имя яруса', tab.name || ('Ярус ' + (i + 1)));
-          if (next == null) return;
-          next = String(next).trim();
-          if (!next) return;
-          tab.name = next.slice(0, 24);
-          save();
-          paintTabs();
         }
 
         function paintAll() {
-          paintTabs();
+          paintNav();
           paintPanel();
           paintField();
           paintSkill();
@@ -3132,7 +3378,8 @@
           if (key === lastLoc) return;
           lastLoc = key;
           if (ctx.settings.get('clearOnLocation')) {
-            maps.tabs[maps.current].grid = emptyGrid();
+            var locTable = currentTable();
+            if (locTable) locTable.grid = emptyGrid();
             save();
           }
           fillFromServer();
@@ -3157,17 +3404,21 @@
         });
 
         ctx.on(tabsEl, 'click', function (e) {
-          var btn = e.target.closest && e.target.closest('button');
-          if (!btn || !tabsEl.contains(btn)) return;
-          var act = btn.getAttribute('data-tab-act');
-          if (act === 'add') { addTab(); return; }
-          if (act === 'del') { deleteTab(); return; }
-          if (btn.hasAttribute('data-tab')) switchTab(parseInt(btn.getAttribute('data-tab'), 10));
-        });
-        ctx.on(tabsEl, 'dblclick', function (e) {
           var btn = e.target.closest && e.target.closest('button[data-tab]');
-          if (!btn) return;
-          renameTab(parseInt(btn.getAttribute('data-tab'), 10));
+          if (!btn || !tabsEl.contains(btn)) return;
+          switchTab(parseInt(btn.getAttribute('data-tab'), 10));
+        });
+        ctx.on(fieldsEl, 'click', function (e) {
+          var btn = e.target.closest && e.target.closest('button[data-field]');
+          if (!btn || !fieldsEl.contains(btn)) return;
+          switchField(parseInt(btn.getAttribute('data-field'), 10));
+        });
+
+        ctx.on(trainBtn, 'click', function (e) {
+          e.stopPropagation();
+          ctx.settings.set('blockDangerous', !ctx.settings.get('blockDangerous'));
+          paintTrain();
+          paintField();
         });
 
         ctx.on(tools, 'click', function (e) {
@@ -3175,7 +3426,8 @@
           if (!btn) return;
           var mark = btn.getAttribute('data-mark');
           if (mark === 'очистить') {
-            maps.tabs[maps.current].grid = emptyGrid();
+            var clearTable = currentTable();
+            if (clearTable) clearTable.grid = emptyGrid();
             save();
             fillFromServer();
             scanUnsafeDom();
@@ -3242,12 +3494,34 @@
         ctx.on(document, 'pointerup', stopDrag);
         ctx.on(document, 'pointercancel', stopDrag);
 
-        ctx.addCleanup(function () {
-          ctx.dom.qsa('#cages td.cage[data-cwb-lu], #cages td.cage[data-cwb-lu-fill]').forEach(clearFieldMarks);
+        function blockDangerousClick(e) {
+          if (!ctx.settings.get('blockDangerous') || fieldHidden()) return;
+          var path = e.target;
+          if (!path || !path.closest) return;
+          if (path.closest('#cwb-lu')) return;
+          var td = path.closest('#cages td.cage');
+          if (!td || !cellIsDangerous(td)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        }
+
+        ['pointerdown', 'mousedown', 'click', 'touchstart'].forEach(function (type) {
+          ctx.on(document, type, blockDangerousClick, true);
         });
 
-        paintTabs();
+        ctx.addCleanup(function () {
+          ctx.dom.qsa('#cages td.cage[data-cwb-lu], #cages td.cage[data-cwb-lu-fill], #cages td.cage[data-cwb-lu-block]').forEach(clearFieldMarks);
+        });
+
+        paintNav();
+        paintTrain();
         save();
+        ctx.addCleanup(ctx.storage.watch(STORAGE_KEY, function (next) {
+          if (ctx.isDisposed() || !next || typeof next !== 'object') return;
+          maps = normalizeMaps(next);
+          paintAll();
+        }));
 
         return ctx.whenVueReady().then(function (vm) {
           if (!vm || ctx.isDisposed()) return;
@@ -3315,6 +3589,7 @@
             readErrorCrack();
             syncFromField();
             syncCatHere();
+            paintTrain();
           }, 50);
 
           if (ctx.vue.onChatMessage) {
@@ -3327,7 +3602,7 @@
       },
 
       onSettings: function (ctx, key) {
-        if (key === 'x' || key === 'y' || key === 'collapsed') return;
+        if (key === 'x' || key === 'y' || key === 'collapsed' || key === 'blockDangerous' || key === 'mapsEditor') return;
         var registry = require('core/registry');
         registry.stopModule('climbing-field');
         registry.startModule('climbing-field');
@@ -3712,6 +3987,33 @@
           registry.startModule('grid');
         }
       },
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/modules/hide-cat-tooltip.js */
+  __def("modules/hide-cat-tooltip", function (require, module, exports) {
+    /**
+     * Скрыть всплывающее окно «О коте».
+     *
+     * Как в CatWar UwU (`hideCatTooltip` в быстрых стилях игровой):
+     *   .cat_tooltip { display: none !important; }
+     *
+     * `.cat_tooltip` — <span> внутри `.cat` на клетке поля: имя, титул, запах,
+     * онлайн. Тот же класс есть и в нюхе. DOM не трогаем — только CSS, клик
+     * по коту и ссылка /catN остаются в разметке.
+     */
+
+    module.exports = {
+      id: 'hide-cat-tooltip',
+      title: 'Скрыть окно «О коте»',
+      description: 'Не показывает всплывашку с именем и запахом при наведении на кота.',
+      category: 'interface',
+      pages: ['game'],
+      enabledByDefault: false,
+      order: 45,
+
+      styles: '.cat_tooltip { display: none !important; }',
     };
   });
 

@@ -100,7 +100,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     input.dispatchEvent(new window.Event('change', { bubbles: true }));
   }
 
-  ['grid', 'always-day', 'clock', 'highlight-moves', 'hide-weather', 'static-background', 'history-autoscroll', 'old-icons']
+  ['grid', 'always-day', 'clock', 'highlight-moves', 'hide-weather', 'hide-cat-tooltip', 'static-background', 'history-autoscroll', 'old-icons']
     .forEach(toggleModule);
   await sleep(200);
 
@@ -113,6 +113,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('часы показывают время', /\d{1,2}:\d{2}/.test(($('#cwb-clock') || {}).textContent || ''));
   check('#cwb-style-hide-weather прячет #tr_sky',
     ($('#cwb-style-hide-weather') || {}).textContent?.includes('#tr_sky'));
+  check('#cwb-style-hide-cat-tooltip прячет .cat_tooltip',
+    ($('#cwb-style-hide-cat-tooltip') || {}).textContent?.includes('.cat_tooltip'));
+  var mockTip = $('.cat_tooltip');
+  check('окно «О коте» скрыто стилем',
+    !!(mockTip && window.getComputedStyle(mockTip).display === 'none'));
   check('#cwb-style-old-icons сгенерирован', !!$('#cwb-style-old-icons'));
   check('настройки записались в localStorage', !!window.localStorage.getItem('cwb:mod.grid'));
 
@@ -159,7 +164,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(80);
 
   console.log('\n7. Выключение модулей — чистота уборки');
-  ['grid', 'always-day', 'clock', 'highlight-moves', 'hide-weather', 'static-background', 'history-autoscroll', 'old-icons']
+  ['grid', 'always-day', 'clock', 'highlight-moves', 'hide-weather', 'hide-cat-tooltip', 'static-background', 'history-autoscroll', 'old-icons']
     .forEach(toggleModule);
   await sleep(200);
 
@@ -168,6 +173,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     .filter((id) => id !== 'cwb-style-core-ui');
   check('не осталось модульных <style>', leftovers.length === 0, leftovers.join(', '));
   check('виджет часов снят', !$('#cwb-clock'));
+  var tipAfter = $('.cat_tooltip');
+  check('окно «О коте» снова видно',
+    !!(tipAfter && window.getComputedStyle(tipAfter).display !== 'none'));
   check('стиль панели на месте', !!$('#cwb-style-core-ui'));
 
   console.log('\n8. Хранилище');
@@ -314,7 +322,55 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('climbing-field: опаска cage.items.type=564 даёт X',
     !!(luDangerType && luDangerType.textContent === 'X'), luDangerType && luDangerType.textContent);
   var luTabs = window.document.querySelectorAll('#cwb-lu-tabs button[data-tab]');
-  check('climbing-field: вкладки ярусов на месте', luTabs.length >= 6, luTabs.length);
+  var luFields = window.document.querySelectorAll('#cwb-lu-fields button[data-field]');
+  var luNavTitles = window.document.querySelectorAll('#cwb-lu-nav h3');
+  check('climbing-field: вкладки на месте', luTabs.length >= 2, luTabs.length);
+  check('climbing-field: поля/локации на месте', luFields.length >= 5, luFields.length);
+  check('climbing-field: подписи Вкладка и Локация',
+    luNavTitles.length >= 2 && luNavTitles[0].textContent === 'Вкладка' && luNavTitles[1].textContent === 'Локация',
+    Array.prototype.map.call(luNavTitles, function (n) { return n.textContent; }).join('/'));
+  var luStyle = $('#cwb-style-climbing-field');
+  check('climbing-field: сетка фиксированной ширины как в uwu',
+    !!(luStyle && luStyle.textContent.indexOf('table-layout:fixed') >= 0
+      && luStyle.textContent.indexOf('width:250px') >= 0),
+    luStyle && luStyle.textContent.slice(0, 80));
+  var luTrain = $('#cwb-lu-train');
+  check('climbing-field: кнопка Кач ЛУ на месте', !!luTrain);
+  check('climbing-field: кач ЛУ включён по умолчанию', !!(luTrain && luTrain.classList.contains('active')));
+  var mineField = window.document.querySelector('#cages td.cage[data-cwb-lu="X"]');
+  var mineReached = false;
+  if (mineField) {
+    mineField.addEventListener('click', function () { mineReached = true; });
+    var mineEv = new window.MouseEvent('click', { bubbles: true, cancelable: true });
+    mineField.dispatchEvent(mineEv);
+    check('climbing-field: кач ЛУ глушит клик по мине', !mineReached && mineEv.defaultPrevented);
+    check('climbing-field: опасная клетка помечена для блока', mineField.getAttribute('data-cwb-lu-block') === '1');
+  } else {
+    check('climbing-field: мина на игровом поле найдена', false);
+  }
+  var safeField = window.document.querySelector('#cages td.cage:not([data-cwb-lu-block])');
+  var safeReached = false;
+  if (safeField) {
+    safeField.addEventListener('click', function () { safeReached = true; });
+    safeField.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+    check('climbing-field: кач ЛУ не глушит безопасную клетку', safeReached);
+  } else {
+    check('climbing-field: безопасная клетка для клика найдена', false);
+  }
+  if (luTrain) {
+    luTrain.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    await sleep(40);
+    check('climbing-field: кач ЛУ выключается кнопкой', !luTrain.classList.contains('active'));
+    mineReached = false;
+    if (mineField) {
+      mineField.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+      check('climbing-field: без кача ЛУ клик по мине доходит', mineReached);
+      check('climbing-field: без кача атрибут блока снят', mineField.getAttribute('data-cwb-lu-block') == null);
+    }
+    luTrain.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    await sleep(40);
+    check('climbing-field: кач ЛУ включается обратно', luTrain.classList.contains('active'));
+  }
   if (luCell) {
     luCell.focus();
     luCell.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'X', bubbles: true }));
@@ -384,8 +440,38 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await sleep(80);
     luEmpty = window.document.querySelector('#cwb-lu-grid td[data-i="0"]');
     check('climbing-field: возврат на вкладку восстанавливает пометку', !!(luEmpty && luEmpty.textContent === '7'));
+    var field1 = window.document.querySelector('#cwb-lu-fields button[data-field="1"]');
+    if (field1) {
+      field1.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await sleep(80);
+      luEmpty = window.document.querySelector('#cwb-lu-grid td[data-i="0"]');
+      check('climbing-field: другое поле — своя карта', !!(luEmpty && luEmpty.textContent === ''));
+      var field0 = window.document.querySelector('#cwb-lu-fields button[data-field="0"]');
+      if (field0) field0.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await sleep(80);
+      luEmpty = window.document.querySelector('#cwb-lu-grid td[data-i="0"]');
+      check('climbing-field: возврат на поле восстанавливает пометку', !!(luEmpty && luEmpty.textContent === '7'));
+    } else {
+      check('climbing-field: второе поле найдено', false);
+    }
   } else {
-    check('climbing-field: вкладка яруса 2 найдена', false);
+    check('climbing-field: вторая вкладка найдена', false);
+  }
+
+  var luCog = $('#cwb-root [data-cwb-mod="climbing-field"] .cwb-mod-cog');
+  if (luCog && $('#cwb-root .cwb-overlay').hidden) {
+    $('#cwb-root .cwb-gear').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    await sleep(40);
+  }
+  if (luCog) {
+    luCog.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    await sleep(40);
+    var mapsEditor = $('#cwb-root .cwb-maps-editor');
+    check('climbing-field: редактор вкладок и полей в настройках', !!mapsEditor);
+    check('climbing-field: в редакторе есть Вкладки', !!(mapsEditor && mapsEditor.textContent.indexOf('Вкладки') >= 0));
+    check('climbing-field: в редакторе есть Локации / Таблицы', !!(mapsEditor && mapsEditor.textContent.indexOf('Локации / Таблицы') >= 0));
+  } else {
+    check('climbing-field: шестерёнка модуля для редактора найдена', false);
   }
 
   function luPointer(type, opts) {

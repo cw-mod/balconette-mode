@@ -1,0 +1,46 @@
+---
+description: Карта модулей Balconette и как точечно добавлять настройки
+alwaysApply: true
+---
+
+# Карта кода и настройки
+
+Сборка: `node build.js` (без зависимостей). Бандл: `dist/` + копия в `docs/`. Версия — `@version` в `src/header.txt`. Новый файл в `src/modules/` подхватывается сам.
+
+## Где что
+
+| Зона | Путь |
+|---|---|
+| Ядро, роутер | `src/core/` (`bootstrap`, `registry`, `vue`, `dom`, `storage`, `config`, `ui`, `socket`) |
+| Панель настроек | `src/core/ui.js` — **не переписывать** ради одной галочки |
+| Поле ЛУ | `src/modules/climbing-field.js`, карты `cwb:climbing-maps` |
+| Оформление поля | `always-day`, `grid`, `static-background`, `hide-weather`, `highlight-moves` |
+| Данные / ID | `param-info`, `skill-fractions`, `mouth-*-ids`, `copy-id`, `pm-ids`, `cell-coords` |
+| Интерфейс | `clock`, `layout-swap`, `action-title`, `history-autoscroll`, `old-icons` |
+| Звук / охота | `sounds`, `notifications`, `hunt-smell-square` |
+| Данные иконок | `src/data/old-icons.js` |
+| Эталон UX | `research/mods/CatWar_UwU/CatWar UwU.user.js` (локально, gitignore) |
+| Разбор модов / DOM | `research/MODS.md`, `research/LIVE_DOM.md` |
+
+Данные игры — из Vue (`ctx.watch` / `ctx.vue`), не из сокета, если `$watch` хватает.
+
+## Настройки: только surgical
+
+Новая опция модуля = ключ в `defaults` + строка в `schema`. Панель сама нарисует контрол.
+
+```js
+// ✅ GOOD — дописать в модуле
+defaults: { overlay: true, hideCatTooltip: false },
+schema: [
+  { key: 'overlay', type: 'boolean', label: 'Дублировать пометки на поле' },
+  { key: 'hideCatTooltip', type: 'boolean', label: "Скрыть окно «О коте»" },
+]
+
+// ❌ BAD — переписать ui.js / config.js / разметку панели
+```
+
+`src/core/ui.js` и `src/core/config.js` трогать, только если нужен **новый тип** контрола. `render()` обязан сохранять раскрытые `.cwb-opts` и фокус (уже сделано — не ломать).
+
+Ядро: ES5 (`var`, `function`). Модуль = один файл, `module.exports`. После `await` — `ctx.isDisposed()`. Модуль чисто выключается через `ctx.*`.
+
+Типы `schema`: `boolean`, `number`, `range`, `text`, `color`, `select`, `textarea`.

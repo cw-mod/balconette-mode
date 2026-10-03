@@ -110,6 +110,15 @@ function css() {
     '.cwb-opt-val{font-size:12px;color:#8a7f70;min-width:34px;}',
     '.cwb-opt-full{flex-direction:column;align-items:stretch;}',
 
+    '.cwb-maps-editor{display:flex;flex-direction:column;gap:8px;width:100%;}',
+    '.cwb-maps-editor h4{margin:4px 0 0;font-size:12px;}',
+    '.cwb-maps-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}',
+    '.cwb-maps-item{display:flex;align-items:center;gap:2px;}',
+    '.cwb-maps-item button,.cwb-maps-row>.cwb-btn{min-height:24px;padding:2px 7px;border:1px solid #d6cbb8;',
+    'border-radius:6px;background:#fff;cursor:pointer;font:inherit;font-size:12px;color:inherit;}',
+    '.cwb-maps-item button.active{background:#e8c27a;border-color:#e8c27a;color:#2a1f12;}',
+    '.cwb-maps-item .cwb-maps-ico{min-width:24px;padding:2px 5px;opacity:.8;}',
+
     '.cwb-foot{flex:0 0 auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;',
     'padding:10px 14px;border-top:1px solid #e6ddcd;background:#f5f0e6;}',
     '.cwb-btn{padding:6px 12px;border:1px solid #d6cbb8;border-radius:7px;background:#fff;cursor:pointer;',
@@ -189,13 +198,28 @@ function control(schemaItem, current, apply) {
     return node;
   }
 
+  if (type === 'custom' && typeof schemaItem.render === 'function') {
+    return schemaItem.render(current, apply, schemaItem) || document.createTextNode('');
+  }
+
   node = dom.el('input', { type: 'text', value: current === undefined || current === null ? '' : String(current), placeholder: schemaItem.placeholder || '' });
   node.addEventListener('change', function (e) { apply(e.target.value); });
   return node;
 }
 
 function optionRow(schemaItem, current, apply) {
-  var full = schemaItem.type === 'textarea';
+  var full = schemaItem.type === 'textarea' || schemaItem.type === 'custom';
+  if (schemaItem.type === 'custom') {
+    return dom.el('div', { class: 'cwb-opt cwb-opt-full' }, [
+      schemaItem.label || schemaItem.hint
+        ? dom.el('label', { class: 'cwb-opt-label' }, [
+          schemaItem.label ? document.createTextNode(schemaItem.label) : null,
+          schemaItem.hint ? dom.el('span', { class: 'cwb-opt-hint', text: schemaItem.hint }) : null,
+        ])
+        : null,
+      control(schemaItem, current, apply),
+    ]);
+  }
   return dom.el('div', { class: 'cwb-opt' + (full ? ' cwb-opt-full' : '') }, [
     dom.el('label', { class: 'cwb-opt-label' }, [
       document.createTextNode(schemaItem.label || schemaItem.key),
