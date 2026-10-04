@@ -2,7 +2,7 @@
 // @name         CatWar Balconette
 // @name:ru      CatWar Balconette
 // @namespace    catwar-balconette
-// @version      0.1.5
+// @version      0.1.6
 // @description  Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
 // @description:ru Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
 // @author       balconette
