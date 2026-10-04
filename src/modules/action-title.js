@@ -53,6 +53,10 @@ module.exports = {
   ],
 
   init: function (ctx) {
+    if (require('core/uwu').hasTitleTimer()) {
+      ctx.log.info('UwU уже пишет таймер в заголовок — пропускаем');
+      return;
+    }
     var baseTitle = document.title || DEFAULT_TITLE;
     var weOwnTitle = false;
 

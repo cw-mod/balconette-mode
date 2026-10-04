@@ -55,7 +55,7 @@ module.exports = {
       // У иконки сезона нет своего id — цепляемся за имя файла symbole/seasonN.png.
       if (s.season) css.push('#tr_tos img[src*="season"] { display: none !important; }');
     }
-    if (s.sky) {
+    if (s.sky && !require('core/uwu').hidingSky()) {
       css.push('#tr_sky { display: none !important; }');
       // На случай, если compact уже вынес #sky из таблицы.
       css.push('#sky { display: none !important; }');

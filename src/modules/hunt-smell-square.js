@@ -49,6 +49,10 @@ module.exports = {
   },
 
   init: function (ctx) {
+    if (require('core/uwu').hasHuntSmell()) {
+      ctx.log.info('UwU уже описывает запах на охоте — нашу подсказку не вешаем');
+      return;
+    }
     var hint = null;
     var timerEl = null;
     var prevRed = null;

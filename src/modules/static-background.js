@@ -69,7 +69,7 @@ module.exports = {
   styles: function (s) {
     var bg = backgroundValue(s);
     var css = [];
-    if (s.target === 'field' || s.target === 'both') {
+    if ((s.target === 'field' || s.target === 'both') && !require('core/uwu').hasFieldBackground()) {
       // background целиком, чтобы убить и инлайновый background-image локации.
       css.push('#cages_div { background: ' + bg + ' !important; }');
     }

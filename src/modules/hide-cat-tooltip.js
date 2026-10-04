@@ -18,5 +18,9 @@ module.exports = {
   enabledByDefault: false,
   order: 45,
 
-  styles: '.cat_tooltip { display: none !important; }',
+  styles: function () {
+    var uwu = require('core/uwu');
+    if (uwu.hidingCatTooltip()) return '';
+    return '.cat_tooltip { display: none !important; }';
+  },
 };

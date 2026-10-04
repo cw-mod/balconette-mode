@@ -7,8 +7,9 @@
  * .cage_items ставит X сама.
  * Плюс: дублируем пометки на клетках #cages и автоматически ставим цифру
  * в клетку, где стоит кот (громкость из чата или ярус field.map[y][x].tree).
- * Режим «Кач ЛУ» глушит клик по опасным клеткам на игровом поле
- * (мина / tree<0 / tree_images/unsafe / опаска 564). Обычный ход не трогаем.
+ * Режим «Кач ЛУ» глушит клик и клавиатуру (WASD / QEZX) по опасным клеткам
+ * на игровом поле (мина / tree<0 / tree_images/unsafe / опаска 564).
+ * Обычный ход и набор в инпутах/чате не трогаем.
  *
  * Не считает шанс залезть. Не пишет в Vue-стейт. Не трогает чат-DOM.
  */
@@ -28,6 +29,25 @@ var UNSAFE_RE = /tree_images\/unsafe/i;
 /** Моргающая опаска на поле — предмет things/564.png на .cage_items (сохранёнка «опаска»). */
 var DANGER_THING_RE = /things\/564(?:\.png)?/i;
 var DANGER_TYPE = 564;
+/** Ходы игры: Key.add("w/a/s/d/q/e/z/x") → field.go(dx, dy). Стрелок и numpad нет. */
+var MOVE_BY_CODE = {
+  KeyW: [0, -1], KeyA: [-1, 0], KeyS: [0, 1], KeyD: [1, 0],
+  KeyQ: [-1, -1], KeyE: [1, -1], KeyZ: [-1, 1], KeyX: [1, 1],
+};
+var MOVE_BY_KEYCODE = {
+  87: [0, -1], 65: [-1, 0], 83: [0, 1], 68: [1, 0],
+  81: [-1, -1], 69: [1, -1], 90: [-1, 1], 88: [1, 1],
+};
+var MOVE_BY_KEY = {
+  w: [0, -1], W: [0, -1], ц: [0, -1], Ц: [0, -1],
+  a: [-1, 0], A: [-1, 0], ф: [-1, 0], Ф: [-1, 0],
+  s: [0, 1], S: [0, 1], ы: [0, 1], Ы: [0, 1],
+  d: [1, 0], D: [1, 0], в: [1, 0], В: [1, 0],
+  q: [-1, -1], Q: [-1, -1], й: [-1, -1], Й: [-1, -1],
+  e: [1, -1], E: [1, -1], у: [1, -1], У: [1, -1],
+  z: [-1, 1], Z: [-1, 1], я: [-1, 1], Я: [-1, 1],
+  x: [1, 1], X: [1, 1], ч: [1, 1], Ч: [1, 1],
+};
 var CRACK = [
   'Без звука',
   'Едва различимый треск',
@@ -232,6 +252,33 @@ function renderMapsEditor() {
       fieldRow.appendChild(addField);
     }
     wrap.appendChild(fieldRow);
+
+    var uwu = require('core/uwu');
+    var importRow = dom.el('div', { class: 'cwb-maps-row' });
+    var importBtn = dom.el('button', {
+      type: 'button',
+      class: 'cwb-btn',
+      text: 'Импорт карт из UwU',
+    });
+    importBtn.addEventListener('click', function () {
+      var imported = uwu.importClimbingMaps();
+      if (!imported) {
+        window.alert('Карт UwU в localStorage нет (ключ uwu_climbingPanelState). Если у них включено единое хранилище GM — мы его прочитать не можем.');
+        return;
+      }
+      if (!window.confirm('Заменить наши карты ЛУ картами из UwU? Пишем только в cwb:climbing-maps, их стор не трогаем.')) return;
+      persist(normalizeMaps(imported));
+    });
+    importRow.appendChild(importBtn);
+    if (uwu.present()) {
+      importRow.appendChild(dom.el('span', {
+        class: 'cwb-opt-hint',
+        text: uwu.importClimbingMaps()
+          ? 'Найдены карты UwU в localStorage.'
+          : 'UwU рядом, но карт минника в localStorage нет.',
+      }));
+    }
+    wrap.appendChild(importRow);
   }
 
   draw();
@@ -347,6 +394,31 @@ function cellLooksUnsafe(td, cage) {
   return false;
 }
 
+function moveDelta(e) {
+  if (!e) return null;
+  if (e.code && MOVE_BY_CODE[e.code]) return MOVE_BY_CODE[e.code];
+  if (e.key && MOVE_BY_KEY[e.key]) return MOVE_BY_KEY[e.key];
+  if (e.keyCode && MOVE_BY_KEYCODE[e.keyCode]) return MOVE_BY_KEYCODE[e.keyCode];
+  return null;
+}
+
+function isTypingContext(el) {
+  if (!el) return false;
+  if (el.nodeType === 3) el = el.parentElement;
+  if (!el || !el.closest) return false;
+  if (el.closest('#chat_form, #text, #cwb-lu, #cwb-root, input, textarea, select, [contenteditable=""], [contenteditable="true"]')) {
+    return true;
+  }
+  var tag = (el.tagName || '').toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || !!el.isContentEditable;
+}
+
+function cageTdAt(x, y) {
+  if (x < 1 || x > COLS || y < 1 || y > ROWS) return null;
+  var tds = document.querySelectorAll('#cages td.cage');
+  return tds[(y - 1) * COLS + (x - 1)] || null;
+}
+
 module.exports = {
   id: 'climbing-field',
   title: 'Поле для ЛУ',
@@ -369,12 +441,17 @@ module.exports = {
   },
 
   schema: [
-    { key: 'overlay', type: 'boolean', label: 'Дублировать пометки на игровом поле' },
+    {
+      key: 'overlay',
+      type: 'boolean',
+      label: 'Дублировать пометки на игровом поле',
+      hint: 'Если в UwU включён перенос заливки на поле — наш оверлей не дублируем.',
+    },
     {
       key: 'blockDangerous',
       type: 'boolean',
       label: 'Кач ЛУ: не нажимать на опасные клетки',
-      hint: 'Глушит клик по минам, опаскам и unsafe. Выключите, чтобы ходить как обычно.',
+      hint: 'Глушит клик и ходьбу с клавиатуры (WASD, QEZX) по минам, опаскам и unsafe. Выключите, чтобы ходить как обычно.',
     },
     {
       key: 'autoFromServer',
@@ -528,7 +605,7 @@ module.exports = {
       type: 'button',
       id: 'cwb-lu-train',
       text: 'Кач ЛУ',
-      title: 'В каче ЛУ не нажимать на опасные клетки',
+      title: 'В каче ЛУ не ходить на опасные клетки',
     });
     var tools = dom.el('div', { id: 'cwb-lu-tools' });
     ['0', '1', '2', '3', '4', '5', '6', '7', 'X', '=', 'очистить'].forEach(function (label) {
@@ -541,7 +618,7 @@ module.exports = {
       table,
       trainBtn,
       tools,
-      dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки и поля настраиваются в панели модов. «Кач ЛУ» глушит клик по опасным клеткам на поле.' }),
+      dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки и поля настраиваются в панели модов. «Кач ЛУ» глушит клик и WASD по опасным клеткам на поле.' }),
     ]);
 
     var panel = dom.el('div', { id: 'cwb-lu' }, [head, body]);
@@ -621,7 +698,7 @@ module.exports = {
       trainBtn.classList.toggle('active', on);
       trainBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
       trainBtn.title = on
-        ? 'Кач ЛУ включён: клик по опасным клеткам заблокирован'
+        ? 'Кач ЛУ включён: клик и клавиатура по опасным клеткам заблокированы'
         : 'Кач ЛУ выключен: обычное передвижение';
     }
 
@@ -629,7 +706,7 @@ module.exports = {
       paintTrain();
       var tds = ctx.dom.qsa('#cages td.cage');
       var hidden = fieldHidden();
-      var overlayOn = ctx.settings.get('overlay') && !hidden;
+      var overlayOn = ctx.settings.get('overlay') && !hidden && !require('core/uwu').transferringClimbing();
       var blockOn = ctx.settings.get('blockDangerous') && !hidden;
       if (!overlayOn && !blockOn) {
         tds.forEach(clearFieldMarks);
@@ -957,8 +1034,27 @@ module.exports = {
       if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     }
 
+    function blockDangerousKey(e) {
+      if (!ctx.settings.get('blockDangerous') || fieldHidden()) return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      var delta = moveDelta(e);
+      if (!delta) return;
+      if (isTypingContext(e.target)) return;
+      var pos = myPos();
+      if (!pos) return;
+      var dest = { x: pos.x + delta[0], y: pos.y + delta[1] };
+      var td = cageTdAt(dest.x, dest.y);
+      if (!cellIsDangerous(td, dest)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    }
+
     ['pointerdown', 'mousedown', 'click', 'touchstart'].forEach(function (type) {
       ctx.on(document, type, blockDangerousClick, true);
+    });
+    ['keydown', 'keypress'].forEach(function (type) {
+      ctx.on(document, type, blockDangerousKey, true);
     });
 
     ctx.addCleanup(function () {

@@ -15,10 +15,16 @@ var log = require('core/log').create('ui');
 var registry = require('core/registry');
 var storage = require('core/storage');
 var config = require('core/config');
+var uwu = require('core/uwu');
 var meta = require('cwb:meta');
 
 var ROOT_ID = 'cwb-root';
 var STYLE_ID = 'core-ui';
+
+var TABS = [
+  { id: 'new', title: 'Новые', hint: 'Модули, которых нет в CatWar UwU' },
+  { id: 'overlay', title: 'Надстройки над UwU', hint: 'Наши штуки поверх / вместо аналогов UwU' },
+];
 
 var state = {
   root: null,
@@ -26,7 +32,10 @@ var state = {
   overlay: null,
   listEl: null,
   searchEl: null,
+  tabsEl: null,
+  noteEl: null,
   query: '',
+  tab: 'new',
   open: false,
   offRegistry: null,
   offKeys: [],
@@ -72,6 +81,15 @@ function css() {
 
     '.cwb-body{flex:1 1 auto;overflow-y:auto;padding:8px 14px 14px;}',
 
+    '.cwb-tabs{display:flex;gap:6px;padding:8px 14px 0;background:#fdfbf7;flex:0 0 auto;}',
+    '.cwb-tab{flex:1 1 0;min-width:0;padding:7px 10px;border:1px solid #d6cbb8;border-radius:8px;',
+    'background:#fff;cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;color:#3d3224;}',
+    '.cwb-tab:hover{background:#f0e9db;}',
+    '.cwb-tab[aria-selected="true"]{background:#e8c27a;border-color:#e8c27a;color:#2a1f12;}',
+    '.cwb-tab-note{padding:6px 14px 0;font-size:11.5px;color:#8a7f70;flex:0 0 auto;}',
+    '.cwb-uwu-banner{margin:6px 0 10px;padding:8px 10px;border-radius:8px;background:#f4efe4;',
+    'border:1px solid #e6ddcd;font-size:12px;color:#5c5348;}',
+
     '.cwb-cat{margin-top:14px;}',
     '.cwb-cat:first-child{margin-top:4px;}',
     '.cwb-cat-title{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#8a7f70;',
@@ -83,9 +101,6 @@ function css() {
     '.cwb-mod-name{font-weight:600;font-size:13.5px;}',
     '.cwb-mod-desc{font-size:12px;color:#7d7367;margin-top:2px;}',
     '.cwb-mod-warn{font-size:12px;color:#9a5b00;margin-top:3px;}',
-    '.cwb-mod-cog{background:none;border:none;cursor:pointer;font-size:14px;opacity:.45;padding:2px 4px;color:inherit;}',
-    '.cwb-mod-cog:hover{opacity:.9;}',
-    '.cwb-mod-cog[hidden]{display:none;}',
 
     '.cwb-sw{position:relative;flex:0 0 auto;width:38px;height:22px;cursor:pointer;margin-top:1px;}',
     '.cwb-sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;}',
@@ -96,7 +111,6 @@ function css() {
     '.cwb-sw input:checked + span::after{transform:translateX(16px);}',
 
     '.cwb-opts{border-top:1px dashed #e6ddcd;padding:9px 11px;background:#fbf8f2;}',
-    '.cwb-opts[hidden]{display:none;}',
     '.cwb-opt{display:flex;align-items:center;gap:10px;padding:4px 0;flex-wrap:wrap;}',
     '.cwb-opt-label{flex:1 1 200px;font-size:12.5px;min-width:0;}',
     '.cwb-opt-hint{display:block;font-size:11.5px;color:#8a7f70;margin-top:1px;}',
@@ -234,8 +248,9 @@ function moduleCard(mod) {
   var enabled = registry.isEnabled(mod.id);
   var hasOpts = (mod.schema || []).length > 0;
 
-  var opts = dom.el('div', { class: 'cwb-opts', hidden: hasOpts ? true : null });
+  var opts = null;
   if (hasOpts) {
+    opts = dom.el('div', { class: 'cwb-opts' });
     mod.schema.forEach(function (item) {
       opts.appendChild(optionRow(item, settings[item.key], function (value) {
         registry.setSetting(mod.id, item.key, value);
@@ -259,23 +274,14 @@ function moduleCard(mod) {
     registry.setEnabled(mod.id, e.target.checked);
   });
 
-  var cog = dom.el('button', {
-    class: 'cwb-mod-cog',
-    type: 'button',
-    title: 'Настройки модуля',
-    text: '⚙',
-    hidden: hasOpts ? null : true,
-    onclick: function () { opts.hidden = !opts.hidden; },
-  });
-
   return dom.el('div', { class: 'cwb-mod', 'data-cwb-mod': mod.id }, [
     dom.el('div', { class: 'cwb-mod-head' }, [
       dom.el('div', { class: 'cwb-mod-main' }, [
         dom.el('div', { class: 'cwb-mod-name', text: mod.title }),
         mod.description ? dom.el('div', { class: 'cwb-mod-desc', text: mod.description }) : null,
+        compatHint(mod),
         mod.warning ? dom.el('div', { class: 'cwb-mod-warn', text: '⚠ ' + mod.warning }) : null,
       ]),
-      cog,
       sw,
     ]),
     opts,
@@ -284,7 +290,7 @@ function moduleCard(mod) {
 
 function coreCard() {
   var current = config.all();
-  var opts = dom.el('div', { class: 'cwb-opts', hidden: true });
+  var opts = dom.el('div', { class: 'cwb-opts' });
   config.SCHEMA.forEach(function (item) {
     opts.appendChild(optionRow(item, current[item.key], function (value) {
       config.set(item.key, value);
@@ -298,13 +304,16 @@ function coreCard() {
         dom.el('div', { class: 'cwb-mod-name', text: 'Ядро' }),
         dom.el('div', { class: 'cwb-mod-desc', text: 'Общие настройки скрипта: кнопка панели, логи, хук сокета.' }),
       ]),
-      dom.el('button', {
-        class: 'cwb-mod-cog', type: 'button', text: '⚙', title: 'Настройки ядра',
-        onclick: function () { opts.hidden = !opts.hidden; },
-      }),
     ]),
     opts,
   ]);
+}
+
+function compatHint(mod) {
+  if (uwu.tabOf(mod) !== 'overlay') return null;
+  var text = uwu.hintFor(mod.id);
+  if (!text) return null;
+  return dom.el('div', { class: 'cwb-mod-desc', text: text });
 }
 
 function matchesQuery(mod, query) {
@@ -313,25 +322,35 @@ function matchesQuery(mod, query) {
   return hay.indexOf(query) >= 0;
 }
 
-/** Какие карточки с раскрытыми .cwb-opts были до перерисовки. */
-function captureExpandedMods() {
-  var expanded = {};
-  if (!state.listEl) return expanded;
-  state.listEl.querySelectorAll('[data-cwb-mod]').forEach(function (modEl) {
-    var opts = modEl.querySelector('.cwb-opts');
-    if (opts && !opts.hidden) expanded[modEl.getAttribute('data-cwb-mod')] = true;
-  });
-  return expanded;
+function matchesTab(mod, tab) {
+  return uwu.tabOf(mod) === tab;
 }
 
-function restoreExpandedMods(expanded) {
-  if (!state.listEl || !expanded) return;
-  Object.keys(expanded).forEach(function (modId) {
-    var modEl = state.listEl.querySelector('[data-cwb-mod="' + modId + '"]');
-    if (!modEl) return;
-    var opts = modEl.querySelector('.cwb-opts');
-    if (opts) opts.hidden = false;
+function currentTabMeta() {
+  for (var i = 0; i < TABS.length; i++) {
+    if (TABS[i].id === state.tab) return TABS[i];
+  }
+  return TABS[0];
+}
+
+function paintTabs() {
+  if (!state.tabsEl) return;
+  state.tabsEl.querySelectorAll('.cwb-tab').forEach(function (btn) {
+    var on = btn.getAttribute('data-cwb-tab') === state.tab;
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
   });
+  if (state.noteEl) {
+    var metaTab = currentTabMeta();
+    var note = metaTab.hint;
+    if (state.tab === 'overlay') {
+      if (uwu.present()) {
+        note = 'UwU найден (' + uwu.sourceLabel() + '). Читаем их localStorage, ничего туда не пишем.';
+      } else {
+        note = metaTab.hint + '. UwU на странице не найден — модули работают сами.';
+      }
+    }
+    state.noteEl.textContent = note;
+  }
 }
 
 /** Чтобы input не терял фокус при registry.onChange → render(). */
@@ -374,17 +393,26 @@ function restoreFocusHint(hint) {
 
 function render() {
   if (!state.listEl) return;
-  var expanded = captureExpandedMods();
   var focusHint = captureFocusHint();
   var query = state.query.trim().toLowerCase();
   state.listEl.textContent = '';
+  paintTabs();
 
-  if (!query) state.listEl.appendChild(coreCard());
+  if (!query && state.tab === 'new') state.listEl.appendChild(coreCard());
+  if (!query && state.tab === 'overlay') {
+    state.listEl.appendChild(dom.el('div', {
+      class: 'cwb-uwu-banner',
+      text: uwu.present()
+        ? 'CatWar UwU рядом: дубли CSS/заголовка/дробей пропускаем, если они уже включены у них. Карты ЛУ можно импортировать в «Поле для ЛУ».'
+        : 'CatWar UwU не найден. Надстройки работают сами; при совместном запуске часть правил не будет дублироваться.',
+    }));
+  }
 
   var shown = 0;
   registry.CATEGORIES.forEach(function (cat) {
     var mods = registry.list().filter(function (m) {
-      return m.category === cat.id && matchesQuery(m, query);
+      if (m.category !== cat.id || !matchesQuery(m, query)) return false;
+      return query ? true : matchesTab(m, state.tab);
     });
     if (!mods.length) return;
     shown += mods.length;
@@ -399,7 +427,6 @@ function render() {
     state.listEl.appendChild(dom.el('div', { class: 'cwb-empty', text: 'Ничего не найдено' }));
   }
 
-  restoreExpandedMods(expanded);
   restoreFocusHint(focusHint);
 }
 
@@ -470,6 +497,25 @@ function mount() {
   var search = dom.el('input', { class: 'cwb-search', type: 'search', placeholder: 'Поиск по модулям…' });
   search.addEventListener('input', function (e) { state.query = e.target.value; render(); });
 
+  var tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
+  TABS.forEach(function (tab) {
+    var btn = dom.el('button', {
+      class: 'cwb-tab',
+      type: 'button',
+      role: 'tab',
+      'data-cwb-tab': tab.id,
+      'aria-selected': tab.id === state.tab ? 'true' : 'false',
+      text: tab.title,
+    });
+    btn.addEventListener('click', function () {
+      if (state.tab === tab.id) return;
+      state.tab = tab.id;
+      render();
+    });
+    tabs.appendChild(btn);
+  });
+  var tabNote = dom.el('div', { class: 'cwb-tab-note' });
+
   var list = dom.el('div', { class: 'cwb-body' });
 
   var modal = dom.el('div', { class: 'cwb-modal' }, [
@@ -479,6 +525,8 @@ function mount() {
       search,
       dom.el('button', { class: 'cwb-x', type: 'button', title: 'Закрыть', text: '×', onclick: close }),
     ]),
+    tabs,
+    tabNote,
     list,
     dom.el('div', { class: 'cwb-foot' }, [
       dom.el('button', {
@@ -517,6 +565,8 @@ function mount() {
   state.overlay = overlay;
   state.listEl = list;
   state.searchEl = search;
+  state.tabsEl = tabs;
+  state.noteEl = tabNote;
 
   isolateKeyboard(root);
 
@@ -578,6 +628,7 @@ function unmount() {
   if (state.root && state.root.parentNode) state.root.remove();
   dom.removeStyle(STYLE_ID);
   state.root = state.gear = state.overlay = state.listEl = state.searchEl = null;
+  state.tabsEl = state.noteEl = null;
   state.open = false;
 }
 
@@ -590,4 +641,5 @@ module.exports = {
   toggle: toggle,
   render: render,
   toast: toast,
+  TABS: TABS,
 };

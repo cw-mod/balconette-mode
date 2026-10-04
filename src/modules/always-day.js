@@ -41,7 +41,9 @@ module.exports = {
   ],
 
   styles: function () {
-    // Инлайновый opacity от weather.light бьётся только !important.
+    var uwu = require('core/uwu');
+    // Тот же CSS, что updateAlwaysDayStyle в UwU — не дублируем.
+    if (uwu.hasAlwaysDay()) return '';
     return '#cages_div { opacity: 1 !important; }';
   },
 

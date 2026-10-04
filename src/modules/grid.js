@@ -38,6 +38,8 @@ module.exports = {
   ],
 
   styles: function (s) {
+    var uwu = require('core/uwu');
+    if (uwu.hasCellBorders()) return '';
     var color = dom.hexToRgba(s.color, s.opacity);
     var w = Math.max(1, Math.min(6, Number(s.width) || 1));
     return '#cages td.cage { box-shadow: inset 0 0 0 ' + w + 'px ' + color + '; }';

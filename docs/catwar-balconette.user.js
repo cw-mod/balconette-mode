@@ -1396,10 +1396,16 @@
     var registry = require('core/registry');
     var storage = require('core/storage');
     var config = require('core/config');
+    var uwu = require('core/uwu');
     var meta = require('cwb:meta');
 
     var ROOT_ID = 'cwb-root';
     var STYLE_ID = 'core-ui';
+
+    var TABS = [
+      { id: 'new', title: 'Новые', hint: 'Модули, которых нет в CatWar UwU' },
+      { id: 'overlay', title: 'Надстройки над UwU', hint: 'Наши штуки поверх / вместо аналогов UwU' },
+    ];
 
     var state = {
       root: null,
@@ -1407,7 +1413,10 @@
       overlay: null,
       listEl: null,
       searchEl: null,
+      tabsEl: null,
+      noteEl: null,
       query: '',
+      tab: 'new',
       open: false,
       offRegistry: null,
       offKeys: [],
@@ -1453,6 +1462,15 @@
 
         '.cwb-body{flex:1 1 auto;overflow-y:auto;padding:8px 14px 14px;}',
 
+        '.cwb-tabs{display:flex;gap:6px;padding:8px 14px 0;background:#fdfbf7;flex:0 0 auto;}',
+        '.cwb-tab{flex:1 1 0;min-width:0;padding:7px 10px;border:1px solid #d6cbb8;border-radius:8px;',
+        'background:#fff;cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;color:#3d3224;}',
+        '.cwb-tab:hover{background:#f0e9db;}',
+        '.cwb-tab[aria-selected="true"]{background:#e8c27a;border-color:#e8c27a;color:#2a1f12;}',
+        '.cwb-tab-note{padding:6px 14px 0;font-size:11.5px;color:#8a7f70;flex:0 0 auto;}',
+        '.cwb-uwu-banner{margin:6px 0 10px;padding:8px 10px;border-radius:8px;background:#f4efe4;',
+        'border:1px solid #e6ddcd;font-size:12px;color:#5c5348;}',
+
         '.cwb-cat{margin-top:14px;}',
         '.cwb-cat:first-child{margin-top:4px;}',
         '.cwb-cat-title{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#8a7f70;',
@@ -1464,9 +1482,6 @@
         '.cwb-mod-name{font-weight:600;font-size:13.5px;}',
         '.cwb-mod-desc{font-size:12px;color:#7d7367;margin-top:2px;}',
         '.cwb-mod-warn{font-size:12px;color:#9a5b00;margin-top:3px;}',
-        '.cwb-mod-cog{background:none;border:none;cursor:pointer;font-size:14px;opacity:.45;padding:2px 4px;color:inherit;}',
-        '.cwb-mod-cog:hover{opacity:.9;}',
-        '.cwb-mod-cog[hidden]{display:none;}',
 
         '.cwb-sw{position:relative;flex:0 0 auto;width:38px;height:22px;cursor:pointer;margin-top:1px;}',
         '.cwb-sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;}',
@@ -1477,7 +1492,6 @@
         '.cwb-sw input:checked + span::after{transform:translateX(16px);}',
 
         '.cwb-opts{border-top:1px dashed #e6ddcd;padding:9px 11px;background:#fbf8f2;}',
-        '.cwb-opts[hidden]{display:none;}',
         '.cwb-opt{display:flex;align-items:center;gap:10px;padding:4px 0;flex-wrap:wrap;}',
         '.cwb-opt-label{flex:1 1 200px;font-size:12.5px;min-width:0;}',
         '.cwb-opt-hint{display:block;font-size:11.5px;color:#8a7f70;margin-top:1px;}',
@@ -1615,8 +1629,9 @@
       var enabled = registry.isEnabled(mod.id);
       var hasOpts = (mod.schema || []).length > 0;
 
-      var opts = dom.el('div', { class: 'cwb-opts', hidden: hasOpts ? true : null });
+      var opts = null;
       if (hasOpts) {
+        opts = dom.el('div', { class: 'cwb-opts' });
         mod.schema.forEach(function (item) {
           opts.appendChild(optionRow(item, settings[item.key], function (value) {
             registry.setSetting(mod.id, item.key, value);
@@ -1640,23 +1655,14 @@
         registry.setEnabled(mod.id, e.target.checked);
       });
 
-      var cog = dom.el('button', {
-        class: 'cwb-mod-cog',
-        type: 'button',
-        title: 'Настройки модуля',
-        text: '⚙',
-        hidden: hasOpts ? null : true,
-        onclick: function () { opts.hidden = !opts.hidden; },
-      });
-
       return dom.el('div', { class: 'cwb-mod', 'data-cwb-mod': mod.id }, [
         dom.el('div', { class: 'cwb-mod-head' }, [
           dom.el('div', { class: 'cwb-mod-main' }, [
             dom.el('div', { class: 'cwb-mod-name', text: mod.title }),
             mod.description ? dom.el('div', { class: 'cwb-mod-desc', text: mod.description }) : null,
+            compatHint(mod),
             mod.warning ? dom.el('div', { class: 'cwb-mod-warn', text: '⚠ ' + mod.warning }) : null,
           ]),
-          cog,
           sw,
         ]),
         opts,
@@ -1665,7 +1671,7 @@
 
     function coreCard() {
       var current = config.all();
-      var opts = dom.el('div', { class: 'cwb-opts', hidden: true });
+      var opts = dom.el('div', { class: 'cwb-opts' });
       config.SCHEMA.forEach(function (item) {
         opts.appendChild(optionRow(item, current[item.key], function (value) {
           config.set(item.key, value);
@@ -1679,13 +1685,16 @@
             dom.el('div', { class: 'cwb-mod-name', text: 'Ядро' }),
             dom.el('div', { class: 'cwb-mod-desc', text: 'Общие настройки скрипта: кнопка панели, логи, хук сокета.' }),
           ]),
-          dom.el('button', {
-            class: 'cwb-mod-cog', type: 'button', text: '⚙', title: 'Настройки ядра',
-            onclick: function () { opts.hidden = !opts.hidden; },
-          }),
         ]),
         opts,
       ]);
+    }
+
+    function compatHint(mod) {
+      if (uwu.tabOf(mod) !== 'overlay') return null;
+      var text = uwu.hintFor(mod.id);
+      if (!text) return null;
+      return dom.el('div', { class: 'cwb-mod-desc', text: text });
     }
 
     function matchesQuery(mod, query) {
@@ -1694,25 +1703,35 @@
       return hay.indexOf(query) >= 0;
     }
 
-    /** Какие карточки с раскрытыми .cwb-opts были до перерисовки. */
-    function captureExpandedMods() {
-      var expanded = {};
-      if (!state.listEl) return expanded;
-      state.listEl.querySelectorAll('[data-cwb-mod]').forEach(function (modEl) {
-        var opts = modEl.querySelector('.cwb-opts');
-        if (opts && !opts.hidden) expanded[modEl.getAttribute('data-cwb-mod')] = true;
-      });
-      return expanded;
+    function matchesTab(mod, tab) {
+      return uwu.tabOf(mod) === tab;
     }
 
-    function restoreExpandedMods(expanded) {
-      if (!state.listEl || !expanded) return;
-      Object.keys(expanded).forEach(function (modId) {
-        var modEl = state.listEl.querySelector('[data-cwb-mod="' + modId + '"]');
-        if (!modEl) return;
-        var opts = modEl.querySelector('.cwb-opts');
-        if (opts) opts.hidden = false;
+    function currentTabMeta() {
+      for (var i = 0; i < TABS.length; i++) {
+        if (TABS[i].id === state.tab) return TABS[i];
+      }
+      return TABS[0];
+    }
+
+    function paintTabs() {
+      if (!state.tabsEl) return;
+      state.tabsEl.querySelectorAll('.cwb-tab').forEach(function (btn) {
+        var on = btn.getAttribute('data-cwb-tab') === state.tab;
+        btn.setAttribute('aria-selected', on ? 'true' : 'false');
       });
+      if (state.noteEl) {
+        var metaTab = currentTabMeta();
+        var note = metaTab.hint;
+        if (state.tab === 'overlay') {
+          if (uwu.present()) {
+            note = 'UwU найден (' + uwu.sourceLabel() + '). Читаем их localStorage, ничего туда не пишем.';
+          } else {
+            note = metaTab.hint + '. UwU на странице не найден — модули работают сами.';
+          }
+        }
+        state.noteEl.textContent = note;
+      }
     }
 
     /** Чтобы input не терял фокус при registry.onChange → render(). */
@@ -1755,17 +1774,26 @@
 
     function render() {
       if (!state.listEl) return;
-      var expanded = captureExpandedMods();
       var focusHint = captureFocusHint();
       var query = state.query.trim().toLowerCase();
       state.listEl.textContent = '';
+      paintTabs();
 
-      if (!query) state.listEl.appendChild(coreCard());
+      if (!query && state.tab === 'new') state.listEl.appendChild(coreCard());
+      if (!query && state.tab === 'overlay') {
+        state.listEl.appendChild(dom.el('div', {
+          class: 'cwb-uwu-banner',
+          text: uwu.present()
+            ? 'CatWar UwU рядом: дубли CSS/заголовка/дробей пропускаем, если они уже включены у них. Карты ЛУ можно импортировать в «Поле для ЛУ».'
+            : 'CatWar UwU не найден. Надстройки работают сами; при совместном запуске часть правил не будет дублироваться.',
+        }));
+      }
 
       var shown = 0;
       registry.CATEGORIES.forEach(function (cat) {
         var mods = registry.list().filter(function (m) {
-          return m.category === cat.id && matchesQuery(m, query);
+          if (m.category !== cat.id || !matchesQuery(m, query)) return false;
+          return query ? true : matchesTab(m, state.tab);
         });
         if (!mods.length) return;
         shown += mods.length;
@@ -1780,7 +1808,6 @@
         state.listEl.appendChild(dom.el('div', { class: 'cwb-empty', text: 'Ничего не найдено' }));
       }
 
-      restoreExpandedMods(expanded);
       restoreFocusHint(focusHint);
     }
 
@@ -1851,6 +1878,25 @@
       var search = dom.el('input', { class: 'cwb-search', type: 'search', placeholder: 'Поиск по модулям…' });
       search.addEventListener('input', function (e) { state.query = e.target.value; render(); });
 
+      var tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
+      TABS.forEach(function (tab) {
+        var btn = dom.el('button', {
+          class: 'cwb-tab',
+          type: 'button',
+          role: 'tab',
+          'data-cwb-tab': tab.id,
+          'aria-selected': tab.id === state.tab ? 'true' : 'false',
+          text: tab.title,
+        });
+        btn.addEventListener('click', function () {
+          if (state.tab === tab.id) return;
+          state.tab = tab.id;
+          render();
+        });
+        tabs.appendChild(btn);
+      });
+      var tabNote = dom.el('div', { class: 'cwb-tab-note' });
+
       var list = dom.el('div', { class: 'cwb-body' });
 
       var modal = dom.el('div', { class: 'cwb-modal' }, [
@@ -1860,6 +1906,8 @@
           search,
           dom.el('button', { class: 'cwb-x', type: 'button', title: 'Закрыть', text: '×', onclick: close }),
         ]),
+        tabs,
+        tabNote,
         list,
         dom.el('div', { class: 'cwb-foot' }, [
           dom.el('button', {
@@ -1898,6 +1946,8 @@
       state.overlay = overlay;
       state.listEl = list;
       state.searchEl = search;
+      state.tabsEl = tabs;
+      state.noteEl = tabNote;
 
       isolateKeyboard(root);
 
@@ -1959,6 +2009,7 @@
       if (state.root && state.root.parentNode) state.root.remove();
       dom.removeStyle(STYLE_ID);
       state.root = state.gear = state.overlay = state.listEl = state.searchEl = null;
+      state.tabsEl = state.noteEl = null;
       state.open = false;
     }
 
@@ -1971,6 +2022,325 @@
       toggle: toggle,
       render: render,
       toast: toast,
+      TABS: TABS,
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/core/uwu.js */
+  __def("core/uwu", function (require, module, exports) {
+    /**
+     * Совместимость с CatWar UwU: только чтение.
+     *
+     * Чужой GM_* из их песочницы Tampermonkey недоступен. Читаем localStorage
+     * ключи `uwu_*` и ищем их узлы в DOM. В их стор не пишем.
+     */
+
+    var log = require('core/log').create('uwu');
+
+    var STORE_KEYS = [
+      'uwu_settings',
+      'uwu_fastStyles',
+      'uwu_fastStyles_hideCatTooltip',
+      'uwu_climbingPanelState',
+      'uwu_climbingPanelStatus',
+      'uwu_clock',
+      'uwu_layoutSettings',
+    ];
+
+    var DOM_IDS = [
+      'uwusettings',
+      'uwu-climbingMainPanel',
+      'uwu-climbingPanel',
+      'uwu-clock',
+      'uwu-fast-style-hideCatTooltip',
+      'uwu-fast-style-hideSky',
+      'cellsBordersStyle',
+    ];
+
+    /**
+     * Модули, у которых в UwU есть прямой аналог. Остальные — вкладка «Новые».
+     * hint показывается в карточке надстройки.
+     */
+    var OVERLAY = {
+      'always-day': {
+        hint: 'В UwU — «Всегда день/ярко» (тот же CSS на #cages_div). Дневное небо — наше. Если там уже включено, наш CSS не дублируем.',
+      },
+      'grid': {
+        hint: 'В UwU — «Границы клеток». Если они включены, нашу сетку не вешаем (два box-shadow на клетке).',
+      },
+      'static-background': {
+        hint: 'В UwU — «Статичный фон локации». Если он включён, фон #cages_div не перебиваем; фон страницы остаётся нашим.',
+      },
+      'hide-weather': {
+        hint: 'В UwU быстрый стиль «Скрыть небо». Если он уже спрятал #tr_sky, наше правило для неба не дублируем.',
+      },
+      'hide-cat-tooltip': {
+        hint: 'В UwU быстрый стиль hideCatTooltip — то же `.cat_tooltip { display:none }`. Если уже скрыто, наш CSS не вешаем.',
+      },
+      'clock': {
+        hint: 'В UwU — свои часы (#uwu-clock). Два виджета сразу перекрываются: отключите одни.',
+      },
+      'action-title': {
+        hint: 'В UwU — «Дублировать время в заголовке вкладки». Если оно включено, заголовок не трогаем.',
+      },
+      'skill-fractions': {
+        hint: 'В UwU — «Точные значения навыков» (тоже .bar-data). Если включено, наши дроби не рисуем.',
+      },
+      'param-info': {
+        hint: 'В UwU — «Подробные параметры» (кнопка над блоком). Наша карточка по клику на навык — рядом, не вместо.',
+      },
+      'sounds': {
+        hint: 'В UwU свой набор звуков (ЛС, конец действия, рот, блок). Не пишем в их стор; при двух модах звуки могут наложиться — выключите дубли там или здесь.',
+      },
+      'hunt-smell-square': {
+        hint: 'В UwU — «Описывать запах на охоте». Если включено, нашу подсказку не вешаем.',
+      },
+      'climbing-field': {
+        hint: 'В UwU — «Минное поле» (#uwu-climbingMainPanel). Кач ЛУ, цифра из [треск] и автоярусы — наши. Если у них включён перенос на поле, наш оверлей не дублируем. Карты можно импортировать из их localStorage.',
+      },
+    };
+
+    function readLocal(key) {
+      try {
+        return window.localStorage.getItem(key);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    /** UwU кладёт в localStorage JSON.stringify(value). Иногда строка ещё раз обёрнута. */
+    function readJson(key) {
+      var raw = readLocal(key);
+      if (raw == null || raw === '') return null;
+      try {
+        var val = JSON.parse(raw);
+        if (typeof val === 'string') {
+          try { val = JSON.parse(val); } catch (e2) { /* оставить строку */ }
+        }
+        return val;
+      } catch (e) {
+        log.debug('не разобрали', key);
+        return null;
+      }
+    }
+
+    function settings() {
+      var s = readJson('uwu_settings');
+      return s && typeof s === 'object' ? s : {};
+    }
+
+    function fastStyles() {
+      var s = readJson('uwu_fastStyles');
+      return s && typeof s === 'object' ? s : {};
+    }
+
+    function setting(key) {
+      return !!settings()[key];
+    }
+
+    function fastStyle(key) {
+      if (fastStyles()[key]) return true;
+      // старый одиночный ключ
+      if (key === 'hideCatTooltip' && readLocal('uwu_fastStyles_hideCatTooltip')) return true;
+      return false;
+    }
+
+    function hasDom() {
+      for (var i = 0; i < DOM_IDS.length; i++) {
+        if (document.getElementById(DOM_IDS[i])) return true;
+      }
+      return !!document.querySelector('[id^="uwu-"], [class*="uwu-"]');
+    }
+
+    function hasStore() {
+      for (var i = 0; i < STORE_KEYS.length; i++) {
+        if (readLocal(STORE_KEYS[i]) != null) return true;
+      }
+      try {
+        var ls = window.localStorage;
+        for (var j = 0; j < ls.length; j++) {
+          var k = ls.key(j);
+          if (k && k.indexOf('uwu_') === 0) return true;
+        }
+      } catch (e) { /* noop */ }
+      return false;
+    }
+
+    function present() {
+      return hasDom() || hasStore();
+    }
+
+    function sourceLabel() {
+      var dom = hasDom();
+      var store = hasStore();
+      if (dom && store) return 'DOM и localStorage';
+      if (dom) return 'DOM';
+      if (store) return 'localStorage';
+      return '';
+    }
+
+    function hidingCatTooltip() {
+      return fastStyle('hideCatTooltip') || !!document.getElementById('uwu-fast-style-hideCatTooltip');
+    }
+
+    function hidingSky() {
+      return fastStyle('hideSky') || !!document.getElementById('uwu-fast-style-hideSky');
+    }
+
+    function hasAlwaysDay() {
+      return setting('alwaysDay');
+    }
+
+    function hasCellBorders() {
+      return setting('cellsBorders') || !!document.getElementById('cellsBordersStyle');
+    }
+
+    function hasFieldBackground() {
+      return setting('gameFieldBackgroundUser');
+    }
+
+    function hasTitleTimer() {
+      return setting('duplicateTimeInBrowserTab');
+    }
+
+    function hasExactSkills() {
+      return setting('showExactSkillsValues');
+    }
+
+    function hasHuntSmell() {
+      return setting('describeHuntingSmell');
+    }
+
+    function transferringClimbing() {
+      var box = document.getElementById('uwu-transferCheckbox');
+      if (box) return !!box.checked;
+      var status = readJson('uwu_climbingPanelStatus');
+      return !!(status && status.isChecked);
+    }
+
+    function hasClimbingPanel() {
+      return setting('climbingPanel') || !!document.getElementById('uwu-climbingMainPanel');
+    }
+
+    function isOverlay(id) {
+      return !!OVERLAY[id];
+    }
+
+    function tabOf(mod) {
+      if (!mod) return 'new';
+      if (mod.compat === 'overlay' || mod.compat === 'new') return mod.compat;
+      return isOverlay(mod.id) ? 'overlay' : 'new';
+    }
+
+    function hintFor(id) {
+      var meta = OVERLAY[id];
+      if (!meta) return '';
+      var parts = [meta.hint];
+      if (!present()) return parts.join(' ');
+      if (id === 'hide-cat-tooltip' && hidingCatTooltip()) {
+        parts.push('Сейчас UwU уже скрыл «О коте» — наш стиль пропущен.');
+      }
+      if (id === 'always-day' && hasAlwaysDay()) {
+        parts.push('Сейчас UwU уже держит поле ярким — наш CSS пропущен.');
+      }
+      if (id === 'grid' && hasCellBorders()) {
+        parts.push('Сейчас у UwU включены границы клеток — нашу сетку не вешаем.');
+      }
+      if (id === 'hide-weather' && hidingSky()) {
+        parts.push('Сейчас UwU уже скрыл небо.');
+      }
+      if (id === 'static-background' && hasFieldBackground()) {
+        parts.push('Сейчас фон локации задаёт UwU — #cages_div не трогаем.');
+      }
+      if (id === 'action-title' && hasTitleTimer()) {
+        parts.push('Сейчас заголовок пишет UwU — наш таймер выключен.');
+      }
+      if (id === 'skill-fractions' && hasExactSkills()) {
+        parts.push('Сейчас дроби рисует UwU — наши не дублируем.');
+      }
+      if (id === 'hunt-smell-square' && hasHuntSmell()) {
+        parts.push('Сейчас подсказку запаха рисует UwU.');
+      }
+      if (id === 'climbing-field' && transferringClimbing()) {
+        parts.push('Сейчас UwU переносит заливку на поле — наш оверлей выключен.');
+      }
+      if (id === 'clock' && (setting('showClock') || document.getElementById('uwu-clock'))) {
+        parts.push('Рядом уже есть часы UwU.');
+      }
+      return parts.filter(Boolean).join(' ');
+    }
+
+    function flattenUwuTable(data) {
+      var flat = [];
+      var y;
+      var x;
+      if (!Array.isArray(data)) return flat;
+      for (y = 0; y < 6; y++) {
+        var row = data[y];
+        for (x = 0; x < 10; x++) {
+          var cell = row && row[x];
+          var v = cell && typeof cell === 'object' ? cell.value : cell;
+          flat.push(typeof v === 'string' ? v : '');
+        }
+      }
+      return flat;
+    }
+
+    /**
+     * Карты минника UwU → наш формат cwb:climbing-maps.
+     * Ничего не пишет: вызывающий сам кладёт в наш стор.
+     */
+    function importClimbingMaps() {
+      var raw = readJson('uwu_climbingPanelState');
+      if (!raw || !Array.isArray(raw.tabs) || !raw.tabs.length) return null;
+      var tabs = raw.tabs.map(function (tab, i) {
+        var tables = [];
+        var list = Array.isArray(tab.tables) ? tab.tables : [];
+        list.forEach(function (t, j) {
+          tables.push({
+            name: String((t && t.name) || ('Поле ' + (j + 1))),
+            grid: flattenUwuTable(t && t.data),
+          });
+        });
+        if (!tables.length) tables.push({ name: 'Поле 1', grid: flattenUwuTable(null) });
+        var currentTable = typeof tab.currentTableId === 'number' ? tab.currentTableId
+          : typeof tab.currentTable === 'number' ? tab.currentTable : 0;
+        if (currentTable < 0 || currentTable >= tables.length) currentTable = 0;
+        return {
+          name: String((tab && tab.name) || ('Вкладка ' + (i + 1))),
+          currentTable: currentTable,
+          tables: tables,
+        };
+      });
+      var currentTab = typeof raw.currentTabIndex === 'number' ? raw.currentTabIndex
+        : typeof raw.currentTab === 'number' ? raw.currentTab : 0;
+      if (currentTab < 0 || currentTab >= tabs.length) currentTab = 0;
+      return { version: 2, currentTab: currentTab, tabs: tabs };
+    }
+
+    module.exports = {
+      OVERLAY: OVERLAY,
+      present: present,
+      sourceLabel: sourceLabel,
+      settings: settings,
+      fastStyles: fastStyles,
+      setting: setting,
+      fastStyle: fastStyle,
+      hidingCatTooltip: hidingCatTooltip,
+      hidingSky: hidingSky,
+      hasAlwaysDay: hasAlwaysDay,
+      hasCellBorders: hasCellBorders,
+      hasFieldBackground: hasFieldBackground,
+      hasTitleTimer: hasTitleTimer,
+      hasExactSkills: hasExactSkills,
+      hasHuntSmell: hasHuntSmell,
+      transferringClimbing: transferringClimbing,
+      hasClimbingPanel: hasClimbingPanel,
+      isOverlay: isOverlay,
+      tabOf: tabOf,
+      hintFor: hintFor,
+      importClimbingMaps: importClimbingMaps,
     };
   });
 
@@ -2310,6 +2680,10 @@
       ],
 
       init: function (ctx) {
+        if (require('core/uwu').hasTitleTimer()) {
+          ctx.log.info('UwU уже пишет таймер в заголовок — пропускаем');
+          return;
+        }
         var baseTitle = document.title || DEFAULT_TITLE;
         var weOwnTitle = false;
 
@@ -2412,7 +2786,9 @@
       ],
 
       styles: function () {
-        // Инлайновый opacity от weather.light бьётся только !important.
+        var uwu = require('core/uwu');
+        // Тот же CSS, что updateAlwaysDayStyle в UwU — не дублируем.
+        if (uwu.hasAlwaysDay()) return '';
         return '#cages_div { opacity: 1 !important; }';
       },
 
@@ -2556,8 +2932,9 @@
      * .cage_items ставит X сама.
      * Плюс: дублируем пометки на клетках #cages и автоматически ставим цифру
      * в клетку, где стоит кот (громкость из чата или ярус field.map[y][x].tree).
-     * Режим «Кач ЛУ» глушит клик по опасным клеткам на игровом поле
-     * (мина / tree<0 / tree_images/unsafe / опаска 564). Обычный ход не трогаем.
+     * Режим «Кач ЛУ» глушит клик и клавиатуру (WASD / QEZX) по опасным клеткам
+     * на игровом поле (мина / tree<0 / tree_images/unsafe / опаска 564).
+     * Обычный ход и набор в инпутах/чате не трогаем.
      *
      * Не считает шанс залезть. Не пишет в Vue-стейт. Не трогает чат-DOM.
      */
@@ -2577,6 +2954,25 @@
     /** Моргающая опаска на поле — предмет things/564.png на .cage_items (сохранёнка «опаска»). */
     var DANGER_THING_RE = /things\/564(?:\.png)?/i;
     var DANGER_TYPE = 564;
+    /** Ходы игры: Key.add("w/a/s/d/q/e/z/x") → field.go(dx, dy). Стрелок и numpad нет. */
+    var MOVE_BY_CODE = {
+      KeyW: [0, -1], KeyA: [-1, 0], KeyS: [0, 1], KeyD: [1, 0],
+      KeyQ: [-1, -1], KeyE: [1, -1], KeyZ: [-1, 1], KeyX: [1, 1],
+    };
+    var MOVE_BY_KEYCODE = {
+      87: [0, -1], 65: [-1, 0], 83: [0, 1], 68: [1, 0],
+      81: [-1, -1], 69: [1, -1], 90: [-1, 1], 88: [1, 1],
+    };
+    var MOVE_BY_KEY = {
+      w: [0, -1], W: [0, -1], ц: [0, -1], Ц: [0, -1],
+      a: [-1, 0], A: [-1, 0], ф: [-1, 0], Ф: [-1, 0],
+      s: [0, 1], S: [0, 1], ы: [0, 1], Ы: [0, 1],
+      d: [1, 0], D: [1, 0], в: [1, 0], В: [1, 0],
+      q: [-1, -1], Q: [-1, -1], й: [-1, -1], Й: [-1, -1],
+      e: [1, -1], E: [1, -1], у: [1, -1], У: [1, -1],
+      z: [-1, 1], Z: [-1, 1], я: [-1, 1], Я: [-1, 1],
+      x: [1, 1], X: [1, 1], ч: [1, 1], Ч: [1, 1],
+    };
     var CRACK = [
       'Без звука',
       'Едва различимый треск',
@@ -2781,6 +3177,33 @@
           fieldRow.appendChild(addField);
         }
         wrap.appendChild(fieldRow);
+
+        var uwu = require('core/uwu');
+        var importRow = dom.el('div', { class: 'cwb-maps-row' });
+        var importBtn = dom.el('button', {
+          type: 'button',
+          class: 'cwb-btn',
+          text: 'Импорт карт из UwU',
+        });
+        importBtn.addEventListener('click', function () {
+          var imported = uwu.importClimbingMaps();
+          if (!imported) {
+            window.alert('Карт UwU в localStorage нет (ключ uwu_climbingPanelState). Если у них включено единое хранилище GM — мы его прочитать не можем.');
+            return;
+          }
+          if (!window.confirm('Заменить наши карты ЛУ картами из UwU? Пишем только в cwb:climbing-maps, их стор не трогаем.')) return;
+          persist(normalizeMaps(imported));
+        });
+        importRow.appendChild(importBtn);
+        if (uwu.present()) {
+          importRow.appendChild(dom.el('span', {
+            class: 'cwb-opt-hint',
+            text: uwu.importClimbingMaps()
+              ? 'Найдены карты UwU в localStorage.'
+              : 'UwU рядом, но карт минника в localStorage нет.',
+          }));
+        }
+        wrap.appendChild(importRow);
       }
 
       draw();
@@ -2896,6 +3319,31 @@
       return false;
     }
 
+    function moveDelta(e) {
+      if (!e) return null;
+      if (e.code && MOVE_BY_CODE[e.code]) return MOVE_BY_CODE[e.code];
+      if (e.key && MOVE_BY_KEY[e.key]) return MOVE_BY_KEY[e.key];
+      if (e.keyCode && MOVE_BY_KEYCODE[e.keyCode]) return MOVE_BY_KEYCODE[e.keyCode];
+      return null;
+    }
+
+    function isTypingContext(el) {
+      if (!el) return false;
+      if (el.nodeType === 3) el = el.parentElement;
+      if (!el || !el.closest) return false;
+      if (el.closest('#chat_form, #text, #cwb-lu, #cwb-root, input, textarea, select, [contenteditable=""], [contenteditable="true"]')) {
+        return true;
+      }
+      var tag = (el.tagName || '').toLowerCase();
+      return tag === 'input' || tag === 'textarea' || tag === 'select' || !!el.isContentEditable;
+    }
+
+    function cageTdAt(x, y) {
+      if (x < 1 || x > COLS || y < 1 || y > ROWS) return null;
+      var tds = document.querySelectorAll('#cages td.cage');
+      return tds[(y - 1) * COLS + (x - 1)] || null;
+    }
+
     module.exports = {
       id: 'climbing-field',
       title: 'Поле для ЛУ',
@@ -2918,12 +3366,17 @@
       },
 
       schema: [
-        { key: 'overlay', type: 'boolean', label: 'Дублировать пометки на игровом поле' },
+        {
+          key: 'overlay',
+          type: 'boolean',
+          label: 'Дублировать пометки на игровом поле',
+          hint: 'Если в UwU включён перенос заливки на поле — наш оверлей не дублируем.',
+        },
         {
           key: 'blockDangerous',
           type: 'boolean',
           label: 'Кач ЛУ: не нажимать на опасные клетки',
-          hint: 'Глушит клик по минам, опаскам и unsafe. Выключите, чтобы ходить как обычно.',
+          hint: 'Глушит клик и ходьбу с клавиатуры (WASD, QEZX) по минам, опаскам и unsafe. Выключите, чтобы ходить как обычно.',
         },
         {
           key: 'autoFromServer',
@@ -3077,7 +3530,7 @@
           type: 'button',
           id: 'cwb-lu-train',
           text: 'Кач ЛУ',
-          title: 'В каче ЛУ не нажимать на опасные клетки',
+          title: 'В каче ЛУ не ходить на опасные клетки',
         });
         var tools = dom.el('div', { id: 'cwb-lu-tools' });
         ['0', '1', '2', '3', '4', '5', '6', '7', 'X', '=', 'очистить'].forEach(function (label) {
@@ -3090,7 +3543,7 @@
           table,
           trainBtn,
           tools,
-          dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки и поля настраиваются в панели модов. «Кач ЛУ» глушит клик по опасным клеткам на поле.' }),
+          dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки и поля настраиваются в панели модов. «Кач ЛУ» глушит клик и WASD по опасным клеткам на поле.' }),
         ]);
 
         var panel = dom.el('div', { id: 'cwb-lu' }, [head, body]);
@@ -3170,7 +3623,7 @@
           trainBtn.classList.toggle('active', on);
           trainBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
           trainBtn.title = on
-            ? 'Кач ЛУ включён: клик по опасным клеткам заблокирован'
+            ? 'Кач ЛУ включён: клик и клавиатура по опасным клеткам заблокированы'
             : 'Кач ЛУ выключен: обычное передвижение';
         }
 
@@ -3178,7 +3631,7 @@
           paintTrain();
           var tds = ctx.dom.qsa('#cages td.cage');
           var hidden = fieldHidden();
-          var overlayOn = ctx.settings.get('overlay') && !hidden;
+          var overlayOn = ctx.settings.get('overlay') && !hidden && !require('core/uwu').transferringClimbing();
           var blockOn = ctx.settings.get('blockDangerous') && !hidden;
           if (!overlayOn && !blockOn) {
             tds.forEach(clearFieldMarks);
@@ -3506,8 +3959,27 @@
           if (e.stopImmediatePropagation) e.stopImmediatePropagation();
         }
 
+        function blockDangerousKey(e) {
+          if (!ctx.settings.get('blockDangerous') || fieldHidden()) return;
+          if (e.ctrlKey || e.altKey || e.metaKey) return;
+          var delta = moveDelta(e);
+          if (!delta) return;
+          if (isTypingContext(e.target)) return;
+          var pos = myPos();
+          if (!pos) return;
+          var dest = { x: pos.x + delta[0], y: pos.y + delta[1] };
+          var td = cageTdAt(dest.x, dest.y);
+          if (!cellIsDangerous(td, dest)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        }
+
         ['pointerdown', 'mousedown', 'click', 'touchstart'].forEach(function (type) {
           ctx.on(document, type, blockDangerousClick, true);
+        });
+        ['keydown', 'keypress'].forEach(function (type) {
+          ctx.on(document, type, blockDangerousKey, true);
         });
 
         ctx.addCleanup(function () {
@@ -3953,6 +4425,8 @@
       ],
 
       styles: function (s) {
+        var uwu = require('core/uwu');
+        if (uwu.hasCellBorders()) return '';
         var color = dom.hexToRgba(s.color, s.opacity);
         var w = Math.max(1, Math.min(6, Number(s.width) || 1));
         return '#cages td.cage { box-shadow: inset 0 0 0 ' + w + 'px ' + color + '; }';
@@ -4013,7 +4487,11 @@
       enabledByDefault: false,
       order: 45,
 
-      styles: '.cat_tooltip { display: none !important; }',
+      styles: function () {
+        var uwu = require('core/uwu');
+        if (uwu.hidingCatTooltip()) return '';
+        return '.cat_tooltip { display: none !important; }';
+      },
     };
   });
 
@@ -4077,7 +4555,7 @@
           // У иконки сезона нет своего id — цепляемся за имя файла symbole/seasonN.png.
           if (s.season) css.push('#tr_tos img[src*="season"] { display: none !important; }');
         }
-        if (s.sky) {
+        if (s.sky && !require('core/uwu').hidingSky()) {
           css.push('#tr_sky { display: none !important; }');
           // На случай, если compact уже вынес #sky из таблицы.
           css.push('#sky { display: none !important; }');
@@ -4302,6 +4780,10 @@
       },
 
       init: function (ctx) {
+        if (require('core/uwu').hasHuntSmell()) {
+          ctx.log.info('UwU уже описывает запах на охоте — нашу подсказку не вешаем');
+          return;
+        }
         var hint = null;
         var timerEl = null;
         var prevRed = null;
@@ -5143,6 +5625,10 @@
       },
 
       init: function (ctx) {
+        if (require('core/uwu').hasExactSkills()) {
+          ctx.log.info('UwU уже рисует дроби на навыках — не дублируем .bar-data');
+          return;
+        }
         function clearMarks() {
           ctx.dom.qsa('[' + MARK + ']').forEach(function (el) {
             if (el.parentNode) el.parentNode.removeChild(el);
@@ -5418,7 +5904,7 @@
       styles: function (s) {
         var bg = backgroundValue(s);
         var css = [];
-        if (s.target === 'field' || s.target === 'both') {
+        if ((s.target === 'field' || s.target === 'both') && !require('core/uwu').hasFieldBackground()) {
           // background целиком, чтобы убить и инлайновый background-image локации.
           css.push('#cages_div { background: ' + bg + ' !important; }');
         }

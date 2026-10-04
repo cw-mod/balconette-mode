@@ -85,16 +85,47 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('input#text жив и внутри #chat_form', !!$('#chat_form #text'));
   check('в #app нет наших узлов', $('#app').querySelectorAll('[id^="cwb-"]').length === 0);
 
+  function switchTab(id) {
+    const btn = $('#cwb-root .cwb-tab[data-cwb-tab="' + id + '"]');
+    if (!btn) throw new Error('не найдена вкладка ' + id);
+    btn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+  }
+
   console.log('\n3. Открытие панели');
   $('#cwb-root .cwb-gear').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
   await sleep(60);
   check('оверлей открылся', !$('#cwb-root .cwb-overlay').hidden);
+  const tabNew = $('#cwb-root .cwb-tab[data-cwb-tab="new"]');
+  const tabOverlay = $('#cwb-root .cwb-tab[data-cwb-tab="overlay"]');
+  check('вкладка «Новые» на месте', !!(tabNew && /Новые/.test(tabNew.textContent)));
+  check('вкладка «Надстройки над UwU» на месте', !!(tabOverlay && /Надстройки/.test(tabOverlay.textContent)));
+  check('по умолчанию открыта «Новые»', tabNew && tabNew.getAttribute('aria-selected') === 'true');
   const cards = window.document.querySelectorAll('#cwb-root [data-cwb-mod]');
-  check('карточки модулей отрисованы', cards.length >= 18, cards.length + ' шт.');
+  check('на вкладке «Новые» есть карточки', cards.length >= 8, cards.length + ' шт.');
+  check('ядро на вкладке «Новые»', !!$('#cwb-root [data-cwb-mod="__core"]'));
+  check('уникальный модуль на «Новых»', !!$('#cwb-root [data-cwb-mod="history-autoscroll"]'));
+  check('надстройка не на «Новых»', !$('#cwb-root [data-cwb-mod="climbing-field"]'));
+  const coreOpts = $('#cwb-root [data-cwb-mod="__core"] .cwb-opts');
+  check('опции ядра сразу видны', !!(coreOpts && !coreOpts.hidden));
+  check('шестерёнки-аккордеона нет', !$('#cwb-root .cwb-mod-cog'));
+  switchTab('overlay');
+  await sleep(40);
+  check('climbing-field на надстройках', !!$('#cwb-root [data-cwb-mod="climbing-field"]'));
+  check('опции надстройки сразу видны', !!$('#cwb-root [data-cwb-mod="grid"] .cwb-opts'));
+  switchTab('new');
+  await sleep(40);
 
   console.log('\n4. Включение модулей');
   function toggleModule(id) {
-    const input = $('#cwb-root [data-cwb-mod="' + id + '"] .cwb-sw input');
+    let input = $('#cwb-root [data-cwb-mod="' + id + '"] .cwb-sw input');
+    if (!input) {
+      switchTab('overlay');
+      input = $('#cwb-root [data-cwb-mod="' + id + '"] .cwb-sw input');
+    }
+    if (!input) {
+      switchTab('new');
+      input = $('#cwb-root [data-cwb-mod="' + id + '"] .cwb-sw input');
+    }
     if (!input) throw new Error('не найден переключатель модуля ' + id);
     input.checked = !input.checked;
     input.dispatchEvent(new window.Event('change', { bubbles: true }));
@@ -102,6 +133,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   ['grid', 'always-day', 'clock', 'highlight-moves', 'hide-weather', 'hide-cat-tooltip', 'static-background', 'history-autoscroll', 'old-icons']
     .forEach(toggleModule);
+  switchTab('overlay');
   await sleep(200);
 
   check('#cwb-style-grid вставлен', !!$('#cwb-style-grid'));
@@ -132,12 +164,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check('поле толщины найдено', false, 'контрол не отрисован');
   }
 
-  console.log('\n5b. Раскрытые настройки не сворачиваются');
+  console.log('\n5b. Настройки модулей всегда открыты');
   const clockCard = $('#cwb-root [data-cwb-mod="clock"]');
-  clockCard?.querySelector('.cwb-mod-cog')?.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-  await sleep(40);
   const clockOpts = clockCard?.querySelector('.cwb-opts');
-  check('настройки часов раскрыты', !!(clockOpts && !clockOpts.hidden));
+  check('настройки часов сразу видны', !!(clockOpts && !clockOpts.hidden));
   const clockFontInput = clockOpts?.querySelector('input[type=number]');
   if (clockFontInput) {
     clockFontInput.focus();
@@ -145,7 +175,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     clockFontInput.dispatchEvent(new window.Event('input', { bubbles: true }));
     await sleep(80);
     const clockOptsAfter = $('#cwb-root [data-cwb-mod="clock"] .cwb-opts');
-    check('после смены fontSize блок настроек часов открыт', !!(clockOptsAfter && !clockOptsAfter.hidden));
+    check('после смены fontSize опции часов на месте', !!(clockOptsAfter && !clockOptsAfter.hidden));
     check('фокус остался на поле fontSize', window.document.activeElement === clockOptsAfter?.querySelector('input[type=number]'));
   } else {
     check('поле fontSize часов найдено', false);
@@ -337,6 +367,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   var luTrain = $('#cwb-lu-train');
   check('climbing-field: кнопка Кач ЛУ на месте', !!luTrain);
   check('climbing-field: кач ЛУ включён по умолчанию', !!(luTrain && luTrain.classList.contains('active')));
+  function fireMoveKey(key, target, type) {
+    var ev = new window.KeyboardEvent(type || 'keydown', {
+      key: key,
+      code: 'Key' + String(key).toUpperCase(),
+      bubbles: true,
+      cancelable: true,
+    });
+    (target || window.document.body).dispatchEvent(ev);
+    return ev;
+  }
+  function putCat(x, y) {
+    vm.field.cats[1].x = x;
+    vm.field.cats[1].y = y;
+  }
   var mineField = window.document.querySelector('#cages td.cage[data-cwb-lu="X"]');
   var mineReached = false;
   if (mineField) {
@@ -357,6 +401,29 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   } else {
     check('climbing-field: безопасная клетка для клика найдена', false);
   }
+  // Кот в моке (2,2). (5,3) = tree<0, (2,4) = things/564.
+  var safeWasd = fireMoveKey('w', window.document.body);
+  check('climbing-field: кач ЛУ не глушит WASD на безопасную', !safeWasd.defaultPrevented);
+  putCat(5, 2);
+  var mineWasd = fireMoveKey('s', window.document.body);
+  check('climbing-field: кач ЛУ глушит WASD на мину', mineWasd.defaultPrevented);
+  var minePress = fireMoveKey('s', window.document.body, 'keypress');
+  check('climbing-field: кач ЛУ глушит keypress на мину', minePress.defaultPrevented);
+  putCat(4, 2);
+  var mineDiag = fireMoveKey('x', window.document.body);
+  check('climbing-field: кач ЛУ глушит диагональ QEZX на мину', mineDiag.defaultPrevented);
+  putCat(2, 3);
+  var mineThing = fireMoveKey('s', window.document.body);
+  check('climbing-field: кач ЛУ глушит WASD на опаску 564', mineThing.defaultPrevented);
+  var chatInput = $('#text');
+  if (chatInput) {
+    chatInput.focus();
+    var chatWasd = fireMoveKey('s', chatInput);
+    check('climbing-field: кач ЛУ не глушит клавиши в чате', !chatWasd.defaultPrevented);
+  } else {
+    check('climbing-field: input#text для проверки чата найден', false);
+  }
+  putCat(2, 2);
   if (luTrain) {
     luTrain.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     await sleep(40);
@@ -367,6 +434,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       check('climbing-field: без кача ЛУ клик по мине доходит', mineReached);
       check('climbing-field: без кача атрибут блока снят', mineField.getAttribute('data-cwb-lu-block') == null);
     }
+    putCat(5, 2);
+    var offWasd = fireMoveKey('s', window.document.body);
+    check('climbing-field: без кача ЛУ WASD на мину доходит', !offWasd.defaultPrevented);
+    putCat(2, 2);
     luTrain.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     await sleep(40);
     check('climbing-field: кач ЛУ включается обратно', luTrain.classList.contains('active'));
@@ -458,21 +529,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check('climbing-field: вторая вкладка найдена', false);
   }
 
-  var luCog = $('#cwb-root [data-cwb-mod="climbing-field"] .cwb-mod-cog');
-  if (luCog && $('#cwb-root .cwb-overlay').hidden) {
+  if ($('#cwb-root .cwb-overlay').hidden) {
     $('#cwb-root .cwb-gear').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
     await sleep(40);
   }
-  if (luCog) {
-    luCog.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-    await sleep(40);
-    var mapsEditor = $('#cwb-root .cwb-maps-editor');
-    check('climbing-field: редактор вкладок и полей в настройках', !!mapsEditor);
-    check('climbing-field: в редакторе есть Вкладки', !!(mapsEditor && mapsEditor.textContent.indexOf('Вкладки') >= 0));
-    check('climbing-field: в редакторе есть Локации / Таблицы', !!(mapsEditor && mapsEditor.textContent.indexOf('Локации / Таблицы') >= 0));
-  } else {
-    check('climbing-field: шестерёнка модуля для редактора найдена', false);
-  }
+  switchTab('overlay');
+  await sleep(40);
+  var mapsEditor = $('#cwb-root .cwb-maps-editor');
+  check('climbing-field: редактор вкладок и полей сразу виден', !!mapsEditor);
+  check('climbing-field: в редакторе есть Вкладки', !!(mapsEditor && mapsEditor.textContent.indexOf('Вкладки') >= 0));
+  check('climbing-field: в редакторе есть Локации / Таблицы', !!(mapsEditor && mapsEditor.textContent.indexOf('Локации / Таблицы') >= 0));
+  check('climbing-field: кнопка импорта карт UwU', !!(mapsEditor && /Импорт карт из UwU/.test(mapsEditor.textContent)));
 
   function luPointer(type, opts) {
     var init = Object.assign({
@@ -572,6 +639,66 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('batch2: стили сняты', !$('#cwb-style-mouth-cat-ids') && !$('#cwb-style-cell-coords'));
   check('batch2: layout-swap снят', !$('#block_deys[data-cwb-layout-swap]'));
   check('batch2: карточка param-info снята', !$('#cwb-param-info'));
+
+  console.log('\n10c. Совместимость с UwU');
+  window.confirm = function () { return true; };
+  window.alert = function () {};
+  window.localStorage.setItem('uwu_settings', JSON.stringify({
+    alwaysDay: true,
+    cellsBorders: true,
+    duplicateTimeInBrowserTab: true,
+    showExactSkillsValues: true,
+    describeHuntingSmell: true,
+    climbingPanel: true,
+  }));
+  window.localStorage.setItem('uwu_fastStyles', JSON.stringify({
+    hideCatTooltip: true,
+    hideSky: true,
+  }));
+  var uwuGrid = [];
+  for (var uy = 0; uy < 6; uy++) {
+    uwuGrid[uy] = [];
+    for (var ux = 0; ux < 10; ux++) {
+      uwuGrid[uy][ux] = { value: uy === 0 && ux === 0 ? '7' : '' };
+    }
+  }
+  window.localStorage.setItem('uwu_climbingPanelState', JSON.stringify({
+    currentTabIndex: 0,
+    tabs: [{
+      name: 'UwU вкладка',
+      currentTableId: 0,
+      tables: [{ name: 'UwU поле', data: uwuGrid }],
+    }],
+  }));
+  if ($('#cwb-root .cwb-overlay').hidden) {
+    $('#cwb-root .cwb-gear').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    await sleep(40);
+  }
+  switchTab('new');
+  await sleep(20);
+  switchTab('overlay');
+  await sleep(60);
+  var banner = $('#cwb-root .cwb-uwu-banner');
+  check('баннер видит UwU', !!(banner && /UwU рядом/.test(banner.textContent)),
+    banner && banner.textContent);
+  ['hide-cat-tooltip', 'always-day', 'grid'].forEach(toggleModule);
+  await sleep(80);
+  check('hide-cat-tooltip не дублирует CSS UwU', !$('#cwb-style-hide-cat-tooltip'));
+  check('always-day не дублирует CSS UwU', !$('#cwb-style-always-day'));
+  check('grid не дублирует CSS UwU', !$('#cwb-style-grid'));
+  var importBtn = [...window.document.querySelectorAll('#cwb-root .cwb-maps-editor button')]
+    .find((b) => /Импорт карт из UwU/.test(b.textContent));
+  if (importBtn) {
+    importBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    await sleep(80);
+    var imported = window.localStorage.getItem('cwb:climbing-maps');
+    check('импорт карт UwU пишет в cwb:climbing-maps',
+      !!(imported && imported.indexOf('UwU вкладка') >= 0 && imported.indexOf('"7"') >= 0));
+    check('импорт не пишет в стор UwU', !!window.localStorage.getItem('uwu_climbingPanelState'));
+  } else {
+    check('кнопка импорта карт UwU найдена', false);
+  }
+  ['hide-cat-tooltip', 'always-day', 'grid'].forEach(toggleModule);
 
   console.log('\n11. Ошибки за сессию');
   check('исключений не было', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));

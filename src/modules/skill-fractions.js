@@ -71,6 +71,10 @@ module.exports = {
   },
 
   init: function (ctx) {
+    if (require('core/uwu').hasExactSkills()) {
+      ctx.log.info('UwU уже рисует дроби на навыках — не дублируем .bar-data');
+      return;
+    }
     function clearMarks() {
       ctx.dom.qsa('[' + MARK + ']').forEach(function (el) {
         if (el.parentNode) el.parentNode.removeChild(el);
