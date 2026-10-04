@@ -1,6 +1,6 @@
 {
   "name": "catwar-balconette",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Модульный юзерскрипт для CatWar (Tampermonkey)",
   "license": "MIT",

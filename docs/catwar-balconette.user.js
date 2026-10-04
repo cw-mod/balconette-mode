@@ -2,7 +2,7 @@
 // @name         CatWar Balconette
 // @name:ru      CatWar Balconette
 // @namespace    catwar-balconette
-// @version      0.1.4
+// @version      0.1.5
 // @description  Модульный набор улучшений для CatWar: настройки в одной панели, каждый модуль включается и выключается на лету.
 // @description:ru Модульный набор улучшений для CatWar: настройки в одной панели, каждый модуль включается и выключается на лету.
 // @author       balconette
@@ -30,7 +30,7 @@
 (function () {
   'use strict';
 
-  var CWB_VERSION = "0.1.4";
+  var CWB_VERSION = "0.1.5";
   var CWB_MODULE_IDS = ["action-title","always-day","cell-coords","climbing-field","clock","copy-id","domain-redirect","grid","hide-cat-tooltip","hide-weather","highlight-moves","history-autoscroll","hunt-smell-square","layout-swap","mouth-cat-ids","mouth-item-ids","notifications","old-icons","param-info","pm-ids","skill-fractions","sounds","static-background"];
 
   var __factories = Object.create(null);
