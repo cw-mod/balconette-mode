@@ -22,7 +22,7 @@ var ROOT_ID = 'cwb-root';
 var STYLE_ID = 'core-ui';
 
 var TABS = [
-  { id: 'new', title: 'Новые', hint: 'Модули, которых нет в CatWar UwU' },
+  { id: 'new', title: 'Новые', hint: 'То, чего в UwU нет' },
   { id: 'overlay', title: 'Надстройки над UwU', hint: 'Наши штуки поверх / вместо аналогов UwU' },
 ];
 
@@ -260,7 +260,7 @@ function moduleCard(mod) {
       dom.el('button', {
         class: 'cwb-btn',
         type: 'button',
-        text: 'Сбросить настройки модуля',
+        text: 'Сбросить настройки',
         onclick: function () { registry.resetSettings(mod.id); render(); },
       }),
     ]));
@@ -302,7 +302,7 @@ function coreCard() {
     dom.el('div', { class: 'cwb-mod-head' }, [
       dom.el('div', { class: 'cwb-mod-main' }, [
         dom.el('div', { class: 'cwb-mod-name', text: 'Ядро' }),
-        dom.el('div', { class: 'cwb-mod-desc', text: 'Общие настройки скрипта: кнопка панели, логи, хук сокета.' }),
+        dom.el('div', { class: 'cwb-mod-desc', text: 'Кнопка панели, логи, хук сокета.' }),
       ]),
     ]),
     opts,
@@ -344,9 +344,9 @@ function paintTabs() {
     var note = metaTab.hint;
     if (state.tab === 'overlay') {
       if (uwu.present()) {
-        note = 'UwU найден (' + uwu.sourceLabel() + '). Читаем их localStorage, ничего туда не пишем.';
+        note = 'UwU найден (' + uwu.sourceLabel() + '). Смотрим их настройки, своё туда не пишем.';
       } else {
-        note = metaTab.hint + '. UwU на странице не найден — модули работают сами.';
+        note = metaTab.hint + '. UwU нет — модули работают сами.';
       }
     }
     state.noteEl.textContent = note;
@@ -403,8 +403,8 @@ function render() {
     state.listEl.appendChild(dom.el('div', {
       class: 'cwb-uwu-banner',
       text: uwu.present()
-        ? 'CatWar UwU рядом: дубли CSS/заголовка/дробей пропускаем, если они уже включены у них. Карты ЛУ можно импортировать в «Поле для ЛУ».'
-        : 'CatWar UwU не найден. Надстройки работают сами; при совместном запуске часть правил не будет дублироваться.',
+        ? 'UwU уже рядом. Что у них включено, второй раз не дублируем. Карты ЛУ можно забрать в «Поле для ЛУ».'
+        : 'UwU нет. Надстройки работают сами. Если включишь оба мода, часть вещей не будет дублироваться.',
     }));
   }
 
@@ -532,8 +532,8 @@ function mount() {
       dom.el('button', {
         class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
         onclick: function () {
-          try { storage.exportToFile(); toast('Файл настроек сохранён'); }
-          catch (e) { log.error(e); toast('Не удалось выгрузить настройки'); }
+          try { storage.exportToFile(); toast('Настройки сохранены'); }
+          catch (e) { log.error(e); toast('Не получилось сохранить настройки'); }
         },
       }),
       dom.el('button', {
@@ -541,7 +541,7 @@ function mount() {
         onclick: function () {
           storage.importFromFile().then(function (count) {
             if (!count) return;
-            toast('Импортировано ключей: ' + count + '. Перезагрузите страницу.');
+            toast('Загружено: ' + count + '. Перезагрузи страницу.');
             render();
           }).catch(function (e) {
             log.error(e);

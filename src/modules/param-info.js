@@ -43,8 +43,8 @@ function needAbs(cat, parameter, key) {
 
 module.exports = {
   id: 'param-info',
-  title: 'Информация о параметре',
-  description: 'Карточка с текущим значением, максимумом, уровнем и абсолютным опытом навыка.',
+  title: 'Карточка параметра',
+  description: 'По клику: текущее значение, максимум, уровень и полный опыт навыка.',
   category: 'info',
   pages: ['game'],
   enabledByDefault: false,
@@ -107,7 +107,7 @@ module.exports = {
         if (!s) return;
         rows.push('<div class="cwb-param-row">Уровень: <b>' + s.level + '</b></div>');
         rows.push('<div class="cwb-param-row">Прогресс: <b>' + s.inLvl + ' / ' + s.span + '</b> (' + (s.barWidth != null ? s.barWidth : '?') + '%)</div>');
-        rows.push('<div class="cwb-param-row">Абсолютный опыт: <b>' + s.abs + '</b></div>');
+        rows.push('<div class="cwb-param-row">Весь опыт: <b>' + s.abs + '</b></div>');
         if (s.toNext != null) rows.push('<div class="cwb-param-row">До след. уровня: <b>' + Math.max(0, Math.round(s.toNext * 100) / 100) + '</b></div>');
         if (d.tooltip) rows.push('<div class="cwb-param-row">Подсказка: ' + dom.escapeHtml(d.tooltip) + '</div>');
       } else {

@@ -679,7 +679,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   switchTab('overlay');
   await sleep(60);
   var banner = $('#cwb-root .cwb-uwu-banner');
-  check('баннер видит UwU', !!(banner && /UwU рядом/.test(banner.textContent)),
+  check('баннер видит UwU', !!(banner && /UwU уже рядом/.test(banner.textContent)),
     banner && banner.textContent);
   ['hide-cat-tooltip', 'always-day', 'grid'].forEach(toggleModule);
   await sleep(80);

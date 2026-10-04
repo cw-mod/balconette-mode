@@ -33,7 +33,7 @@ function realTime(s) {
 module.exports = {
   id: 'clock',
   title: 'Часы',
-  description: 'Плавающие часы: реальное время и, по желанию, игровой час и сезон.',
+  description: 'Плавающие часы. Реальное время, по желанию ещё игровой час и сезон.',
   category: 'interface',
   pages: ['game', 'hunt', 'chat', 'pm'],
   enabledByDefault: false,
@@ -60,7 +60,7 @@ module.exports = {
       ],
     },
     { key: 'showSeconds', type: 'boolean', label: 'Показывать секунды' },
-    { key: 'showGameHour', type: 'boolean', label: 'Игровой час', hint: 'Читается из Vue (weather.hour), только на игровой странице.' },
+    { key: 'showGameHour', type: 'boolean', label: 'Игровой час', hint: 'Только на игровой странице.' },
     { key: 'showSeason', type: 'boolean', label: 'Игровой сезон' },
     { key: 'fontSize', type: 'number', label: 'Размер шрифта, px', min: 9, max: 40, step: 1 },
   ],
@@ -80,7 +80,7 @@ module.exports = {
 
     var main = dom.el('span', { class: 'cwb-clock-main' });
     var sub = dom.el('span', { class: 'cwb-clock-sub' });
-    var node = dom.el('div', { id: 'cwb-clock', title: 'Часы CatWar Balconette — можно перетащить' }, [main, sub]);
+    var node = dom.el('div', { id: 'cwb-clock', title: 'Можно перетащить' }, [main, sub]);
 
     // Положение: сохранённое или по умолчанию сверху слева.
     if (typeof s.x === 'number' && typeof s.y === 'number') {

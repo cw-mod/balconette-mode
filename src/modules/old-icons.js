@@ -46,12 +46,12 @@ function buildMap(s, log) {
 module.exports = {
   id: 'old-icons',
   title: 'Старые иконки действий',
-  description: 'Подменяет картинки кнопок действий на прежние.',
+  description: 'Ставит старые картинки на кнопки действий.',
   category: 'interface',
   pages: ['game'],
   enabledByDefault: false,
   order: 20,
-  warning: 'Встроенный словарь неполный (' + data.count + ' иконок) и ведёт на сторонний хостинг d.zaix.ru. Надёжнее указать свой базовый URL или словарь.',
+  warning: 'Встроенный список неполный (' + data.count + ' иконок) и тянет картинки с d.zaix.ru. Лучше свой URL или свой словарь.',
 
   defaults: {
     source: 'builtin',     // builtin | base | custom
@@ -78,7 +78,7 @@ module.exports = {
       label: 'Свой словарь',
       placeholder: '{\n  "1": "https://…/1.png",\n  "exchange": "https://…/exchange.png"\n}',
     },
-    { key: 'includeExtra', type: 'boolean', label: 'Подменять и иконку диалога (#dialog > img)' },
+    { key: 'includeExtra', type: 'boolean', label: 'Менять ещё и иконку диалога' },
   ],
 
   styles: function (s) {

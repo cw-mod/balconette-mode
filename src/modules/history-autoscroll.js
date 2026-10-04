@@ -15,7 +15,7 @@ var dom = require('core/dom');
 module.exports = {
   id: 'history-autoscroll',
   title: 'Автопрокрутка истории',
-  description: 'Держит блок истории (#ist) прокрученным к последней записи.',
+  description: 'Держит историю прокрученной к последней записи.',
   category: 'info',
   pages: ['game'],
   enabledByDefault: false,
@@ -32,7 +32,7 @@ module.exports = {
       key: 'respectUserScroll',
       type: 'boolean',
       label: 'Не мешать, если прокрутил вверх',
-      hint: 'Автопрокрутка возобновится, как только вернётесь к низу списка.',
+      hint: 'Автопрокрутка вернётся, как только снова окажешься внизу.',
     },
     { key: 'threshold', type: 'number', label: 'Зона «у низа», px', min: 0, max: 600, step: 10 },
     { key: 'smooth', type: 'boolean', label: 'Плавная прокрутка' },

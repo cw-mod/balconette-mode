@@ -186,7 +186,7 @@ function renderMapsEditor() {
       });
       var renameBtn = dom.el('button', { type: 'button', class: 'cwb-maps-ico', text: '✎', title: 'Переименовать вкладку' });
       renameBtn.addEventListener('click', function () {
-        var next = ask('Введите новое имя вкладки:', tab.name);
+        var next = ask('Новое имя вкладки:', tab.name);
         if (!next) return;
         maps.tabs[i].name = next;
         persist(maps);
@@ -202,7 +202,7 @@ function renderMapsEditor() {
     var addTab = dom.el('button', { type: 'button', class: 'cwb-btn', text: '+' });
     addTab.addEventListener('click', function () {
       if (maps.tabs.length >= MAX_TABS) return;
-      var name = ask('Введите имя вкладки:');
+      var name = ask('Имя вкладки:');
       if (!name) return;
       maps.tabs.push(emptyTab(name, 0));
       maps.currentTab = maps.tabs.length - 1;
@@ -227,7 +227,7 @@ function renderMapsEditor() {
         });
         var renameBtn = dom.el('button', { type: 'button', class: 'cwb-maps-ico', text: '✎', title: 'Переименовать поле' });
         renameBtn.addEventListener('click', function () {
-          var next = ask('Введите новое имя поля:', table.name);
+          var next = ask('Новое имя поля:', table.name);
           if (!next) return;
           tab.tables[i].name = next;
           persist(maps);
@@ -243,7 +243,7 @@ function renderMapsEditor() {
       var addField = dom.el('button', { type: 'button', class: 'cwb-btn', text: '+' });
       addField.addEventListener('click', function () {
         if (tab.tables.length >= MAX_FIELDS) return;
-        var name = ask('Введите имя поля:');
+        var name = ask('Имя поля:');
         if (!name) return;
         tab.tables.push(emptyTable(name));
         tab.currentTable = tab.tables.length - 1;
@@ -263,10 +263,10 @@ function renderMapsEditor() {
     importBtn.addEventListener('click', function () {
       var imported = uwu.importClimbingMaps();
       if (!imported) {
-        window.alert('Карт UwU в localStorage нет (ключ uwu_climbingPanelState). Если у них включено единое хранилище GM — мы его прочитать не можем.');
+        window.alert('Карт UwU в localStorage нет. Если у них включено единое хранилище Tampermonkey — мы его не видим.');
         return;
       }
-      if (!window.confirm('Заменить наши карты ЛУ картами из UwU? Пишем только в cwb:climbing-maps, их стор не трогаем.')) return;
+      if (!window.confirm('Заменить наши карты ЛУ картами из UwU? Их карты не трогаем, пишем только к себе.')) return;
       persist(normalizeMaps(imported));
     });
     importRow.appendChild(importBtn);
@@ -422,7 +422,7 @@ function cageTdAt(x, y) {
 module.exports = {
   id: 'climbing-field',
   title: 'Поле для ЛУ',
-  description: 'Минное поле 10×6 со вкладками и полями-локациями: цифры треска, мины и переходы. Карты сохраняются между обновлениями.',
+  description: 'Минное поле 10×6: вкладки, локации, цифры треска, мины и переходы. Карты не слетают после обновления.',
   category: 'field',
   pages: ['game'],
   enabledByDefault: false,
@@ -445,25 +445,25 @@ module.exports = {
       key: 'overlay',
       type: 'boolean',
       label: 'Дублировать пометки на игровом поле',
-      hint: 'Если в UwU включён перенос заливки на поле — наш оверлей не дублируем.',
+      hint: 'Если в UwU уже переносится заливка на поле — нашу не рисуем.',
     },
     {
       key: 'blockDangerous',
       type: 'boolean',
       label: 'Кач ЛУ: не нажимать на опасные клетки',
-      hint: 'Глушит клик и ходьбу с клавиатуры (WASD, QEZX) по минам, опаскам и unsafe. Выключите, чтобы ходить как обычно.',
+      hint: 'Не даёт кликнуть и пойти с клавиатуры (WASD, QEZX) на мины, опаски и unsafe. Выключи, если хочешь ходить как обычно.',
     },
     {
       key: 'autoFromServer',
       type: 'boolean',
       label: 'Подтягивать ярусы деревьев из игры',
-      hint: 'Если сервер прислал field.map[y][x].tree — пустые клетки заполнятся сами.',
+      hint: 'Если игра уже знает ярус — пустые клетки заполнятся сами.',
     },
     {
       key: 'autoFromChat',
       type: 'boolean',
       label: 'Ставить цифру в клетку кота по треску в чате',
-      hint: 'Сообщение [треск] (msg.volume 0–7) → клетка, где стоит ваш кот. Не любые системные реплики.',
+      hint: 'Берёт громкость из [треск] (0–7) и ставит в клетку, где стоит твой кот. Обычные системные реплики не считает.',
     },
     {
       key: 'showSkill',
@@ -474,13 +474,13 @@ module.exports = {
       key: 'clearOnLocation',
       type: 'boolean',
       label: 'Очищать текущее поле при смене локации',
-      hint: 'По умолчанию выключено: карты хранятся во вкладках и полях и переживают обновление страницы.',
+      hint: 'По умолчанию выключено. Карты лежат во вкладках и не пропадают после обновления.',
     },
     {
       key: 'mapsEditor',
       type: 'custom',
       label: 'Вкладки и поля',
-      hint: 'Добавить, удалить или переименовать вкладки и таблицы-поля внутри выбранной вкладки.',
+      hint: 'Добавить, удалить или переименовать вкладки и таблицы внутри выбранной вкладки.',
       render: renderMapsEditor,
     },
   ],
@@ -600,7 +600,7 @@ module.exports = {
       dom.el('h3', { text: 'Локация' }),
       fieldsEl,
     ]);
-    var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавьте поле/таблицу в настройках' });
+    var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавь поле или таблицу в настройках' });
     var trainBtn = dom.el('button', {
       type: 'button',
       id: 'cwb-lu-train',
@@ -618,7 +618,7 @@ module.exports = {
       table,
       trainBtn,
       tools,
-      dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки и поля настраиваются в панели модов. «Кач ЛУ» глушит клик и WASD по опасным клеткам на поле.' }),
+      dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки и поля — в панели модов. «Кач ЛУ» не даёт кликнуть и пойти WASD на опасные клетки.' }),
     ]);
 
     var panel = dom.el('div', { id: 'cwb-lu' }, [head, body]);

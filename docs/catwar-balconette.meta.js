@@ -3,8 +3,8 @@
 // @name:ru      CatWar Balconette
 // @namespace    catwar-balconette
 // @version      0.1.5
-// @description  Модульный набор улучшений для CatWar: настройки в одной панели, каждый модуль включается и выключается на лету.
-// @description:ru Модульный набор улучшений для CatWar: настройки в одной панели, каждый модуль включается и выключается на лету.
+// @description  Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
+// @description:ru Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
 // @author       balconette
 // @license      MIT
 // @homepageURL  https://cw-mod.github.io/balconette-mode/

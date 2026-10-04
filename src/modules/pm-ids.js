@@ -13,7 +13,7 @@ var SEL_MSG_LOGIN = '#msg_login';
 module.exports = {
   id: 'pm-ids',
   title: 'ID в личных сообщениях',
-  description: 'Показывает числовой ID рядом с ником в списке и в открытом письме.',
+  description: 'Числовой ID рядом с ником в списке и в открытом письме.',
   category: 'info',
   pages: ['pm'],
   enabledByDefault: false,

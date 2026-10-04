@@ -3,8 +3,8 @@
 // @name:ru      CatWar Balconette
 // @namespace    catwar-balconette
 // @version      0.1.5
-// @description  Модульный набор улучшений для CatWar: настройки в одной панели, каждый модуль включается и выключается на лету.
-// @description:ru Модульный набор улучшений для CatWar: настройки в одной панели, каждый модуль включается и выключается на лету.
+// @description  Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
+// @description:ru Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
 // @author       balconette
 // @license      MIT
 // @homepageURL  https://cw-mod.github.io/balconette-mode/
@@ -291,7 +291,7 @@
           { value: 'top-left', label: 'Вверху слева' },
         ],
       },
-      { key: 'gearHidden', type: 'boolean', label: 'Спрятать кнопку-шестерёнку', hint: 'Панель останется доступной по Ctrl+Alt+B' },
+      { key: 'gearHidden', type: 'boolean', label: 'Спрятать кнопку-шестерёнку', hint: 'Панель всё равно откроется по Ctrl+Alt+B' },
       { key: 'hotkey', type: 'boolean', label: 'Открывать панель по Ctrl+Alt+B' },
       {
         key: 'logLevel',
@@ -309,7 +309,7 @@
         key: 'socketHook',
         type: 'boolean',
         label: 'Хук игрового сокета (экспериментально)',
-        hint: 'Нужен только будущим модулям. Требует перезагрузки страницы. Ничего не отправляет на сервер.',
+        hint: 'Пока никому не нужен. После включения перезагрузи страницу. На сервер ничего не шлёт.',
       },
     ];
 
@@ -1414,7 +1414,7 @@
     var STYLE_ID = 'core-ui';
 
     var TABS = [
-      { id: 'new', title: 'Новые', hint: 'Модули, которых нет в CatWar UwU' },
+      { id: 'new', title: 'Новые', hint: 'То, чего в UwU нет' },
       { id: 'overlay', title: 'Надстройки над UwU', hint: 'Наши штуки поверх / вместо аналогов UwU' },
     ];
 
@@ -1652,7 +1652,7 @@
           dom.el('button', {
             class: 'cwb-btn',
             type: 'button',
-            text: 'Сбросить настройки модуля',
+            text: 'Сбросить настройки',
             onclick: function () { registry.resetSettings(mod.id); render(); },
           }),
         ]));
@@ -1694,7 +1694,7 @@
         dom.el('div', { class: 'cwb-mod-head' }, [
           dom.el('div', { class: 'cwb-mod-main' }, [
             dom.el('div', { class: 'cwb-mod-name', text: 'Ядро' }),
-            dom.el('div', { class: 'cwb-mod-desc', text: 'Общие настройки скрипта: кнопка панели, логи, хук сокета.' }),
+            dom.el('div', { class: 'cwb-mod-desc', text: 'Кнопка панели, логи, хук сокета.' }),
           ]),
         ]),
         opts,
@@ -1736,9 +1736,9 @@
         var note = metaTab.hint;
         if (state.tab === 'overlay') {
           if (uwu.present()) {
-            note = 'UwU найден (' + uwu.sourceLabel() + '). Читаем их localStorage, ничего туда не пишем.';
+            note = 'UwU найден (' + uwu.sourceLabel() + '). Смотрим их настройки, своё туда не пишем.';
           } else {
-            note = metaTab.hint + '. UwU на странице не найден — модули работают сами.';
+            note = metaTab.hint + '. UwU нет — модули работают сами.';
           }
         }
         state.noteEl.textContent = note;
@@ -1795,8 +1795,8 @@
         state.listEl.appendChild(dom.el('div', {
           class: 'cwb-uwu-banner',
           text: uwu.present()
-            ? 'CatWar UwU рядом: дубли CSS/заголовка/дробей пропускаем, если они уже включены у них. Карты ЛУ можно импортировать в «Поле для ЛУ».'
-            : 'CatWar UwU не найден. Надстройки работают сами; при совместном запуске часть правил не будет дублироваться.',
+            ? 'UwU уже рядом. Что у них включено, второй раз не дублируем. Карты ЛУ можно забрать в «Поле для ЛУ».'
+            : 'UwU нет. Надстройки работают сами. Если включишь оба мода, часть вещей не будет дублироваться.',
         }));
       }
 
@@ -1924,8 +1924,8 @@
           dom.el('button', {
             class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
             onclick: function () {
-              try { storage.exportToFile(); toast('Файл настроек сохранён'); }
-              catch (e) { log.error(e); toast('Не удалось выгрузить настройки'); }
+              try { storage.exportToFile(); toast('Настройки сохранены'); }
+              catch (e) { log.error(e); toast('Не получилось сохранить настройки'); }
             },
           }),
           dom.el('button', {
@@ -1933,7 +1933,7 @@
             onclick: function () {
               storage.importFromFile().then(function (count) {
                 if (!count) return;
-                toast('Импортировано ключей: ' + count + '. Перезагрузите страницу.');
+                toast('Загружено: ' + count + '. Перезагрузи страницу.');
                 render();
               }).catch(function (e) {
                 log.error(e);
@@ -2075,40 +2075,40 @@
      */
     var OVERLAY = {
       'always-day': {
-        hint: 'В UwU — «Всегда день/ярко» (тот же CSS на #cages_div). Дневное небо — наше. Если там уже включено, наш CSS не дублируем.',
+        hint: 'В UwU — «Всегда день/ярко». Дневное небо — наше. Если у них уже включено, наше поле не трогаем.',
       },
       'grid': {
-        hint: 'В UwU — «Границы клеток». Если они включены, нашу сетку не вешаем (два box-shadow на клетке).',
+        hint: 'В UwU — «Границы клеток». Если они включены, нашу сетку не рисуем.',
       },
       'static-background': {
-        hint: 'В UwU — «Статичный фон локации». Если он включён, фон #cages_div не перебиваем; фон страницы остаётся нашим.',
+        hint: 'В UwU — «Статичный фон локации». Если он включён, фон поля не трогаем, фон страницы остаётся нашим.',
       },
       'hide-weather': {
-        hint: 'В UwU быстрый стиль «Скрыть небо». Если он уже спрятал #tr_sky, наше правило для неба не дублируем.',
+        hint: 'В UwU быстрый стиль «Скрыть небо». Если небо уже спрятано, наше не дублируем.',
       },
       'hide-cat-tooltip': {
-        hint: 'В UwU быстрый стиль hideCatTooltip — то же `.cat_tooltip { display:none }`. Если уже скрыто, наш CSS не вешаем.',
+        hint: 'В UwU есть быстрый стиль «скрыть окно О коте». Если уже скрыто, наше не вешаем.',
       },
       'clock': {
-        hint: 'В UwU — свои часы (#uwu-clock). Два виджета сразу перекрываются: отключите одни.',
+        hint: 'В UwU — свои часы. Два виджета сразу налезают друг на друга: выключи одни.',
       },
       'action-title': {
         hint: 'В UwU — «Дублировать время в заголовке вкладки». Если оно включено, заголовок не трогаем.',
       },
       'skill-fractions': {
-        hint: 'В UwU — «Точные значения навыков» (тоже .bar-data). Если включено, наши дроби не рисуем.',
+        hint: 'В UwU — «Точные значения навыков». Если включено, наши дроби не рисуем.',
       },
       'param-info': {
         hint: 'В UwU — «Подробные параметры» (кнопка над блоком). Наша карточка по клику на навык — рядом, не вместо.',
       },
       'sounds': {
-        hint: 'В UwU свой набор звуков (ЛС, конец действия, рот, блок). Не пишем в их стор; при двух модах звуки могут наложиться — выключите дубли там или здесь.',
+        hint: 'В UwU свой набор звуков (ЛС, конец действия, рот, блок). В их настройки не лезем. Если оба мода включены, звуки могут наложиться — выключи дубли там или здесь.',
       },
       'hunt-smell-square': {
         hint: 'В UwU — «Описывать запах на охоте». Если включено, нашу подсказку не вешаем.',
       },
       'climbing-field': {
-        hint: 'В UwU — «Минное поле» (#uwu-climbingMainPanel). Кач ЛУ, цифра из [треск] и автоярусы — наши. Если у них включён перенос на поле, наш оверлей не дублируем. Карты можно импортировать из их localStorage.',
+        hint: 'В UwU — «Минное поле». Кач ЛУ, цифра из [треск] и автоярусы — наши. Если у них заливка уже уходит на поле, нашу не рисуем. Карты можно забрать из их localStorage.',
       },
     };
 
@@ -2250,10 +2250,10 @@
       var parts = [meta.hint];
       if (!present()) return parts.join(' ');
       if (id === 'hide-cat-tooltip' && hidingCatTooltip()) {
-        parts.push('Сейчас UwU уже скрыл «О коте» — наш стиль пропущен.');
+        parts.push('Сейчас UwU уже скрыл «О коте» — наше не вешаем.');
       }
       if (id === 'always-day' && hasAlwaysDay()) {
-        parts.push('Сейчас UwU уже держит поле ярким — наш CSS пропущен.');
+        parts.push('Сейчас UwU уже держит поле ярким — наше не дублируем.');
       }
       if (id === 'grid' && hasCellBorders()) {
         parts.push('Сейчас у UwU включены границы клеток — нашу сетку не вешаем.');
@@ -2262,7 +2262,7 @@
         parts.push('Сейчас UwU уже скрыл небо.');
       }
       if (id === 'static-background' && hasFieldBackground()) {
-        parts.push('Сейчас фон локации задаёт UwU — #cages_div не трогаем.');
+        parts.push('Сейчас фон локации задаёт UwU — поле не трогаем.');
       }
       if (id === 'action-title' && hasTitleTimer()) {
         parts.push('Сейчас заголовок пишет UwU — наш таймер выключен.');
@@ -2671,7 +2671,7 @@
     module.exports = {
       id: 'action-title',
       title: 'Таймер действия в заголовке',
-      description: 'Пока идёт действие, во вкладке браузера пишется, сколько секунд осталось.',
+      description: 'Пока идёт действие, во вкладке браузера видно, сколько осталось.',
       category: 'interface',
       pages: ['game', 'hunt'],
       enabledByDefault: false,
@@ -2686,7 +2686,7 @@
           key: 'showName',
           type: 'boolean',
           label: 'Писать название действия рядом со временем',
-          hint: 'Как в CW Shed: «1 мин 12 с / Вылизаться». Если выключено — только время, как в CW Mod.',
+          hint: 'Как в Shed: «1 мин 12 с / Вылизаться». Без галочки — только время, как в CW Mod.',
         },
       ],
 
@@ -2792,7 +2792,7 @@
           key: 'daySky',
           type: 'boolean',
           label: 'Дневное небо над полем',
-          hint: 'Подменяет ночную картинку #sky на дневную того же сезона и погоды.',
+          hint: 'Меняет ночную картинку неба на дневную того же сезона и погоды.',
         },
       ],
 
@@ -3122,7 +3122,7 @@
           });
           var renameBtn = dom.el('button', { type: 'button', class: 'cwb-maps-ico', text: '✎', title: 'Переименовать вкладку' });
           renameBtn.addEventListener('click', function () {
-            var next = ask('Введите новое имя вкладки:', tab.name);
+            var next = ask('Новое имя вкладки:', tab.name);
             if (!next) return;
             maps.tabs[i].name = next;
             persist(maps);
@@ -3138,7 +3138,7 @@
         var addTab = dom.el('button', { type: 'button', class: 'cwb-btn', text: '+' });
         addTab.addEventListener('click', function () {
           if (maps.tabs.length >= MAX_TABS) return;
-          var name = ask('Введите имя вкладки:');
+          var name = ask('Имя вкладки:');
           if (!name) return;
           maps.tabs.push(emptyTab(name, 0));
           maps.currentTab = maps.tabs.length - 1;
@@ -3163,7 +3163,7 @@
             });
             var renameBtn = dom.el('button', { type: 'button', class: 'cwb-maps-ico', text: '✎', title: 'Переименовать поле' });
             renameBtn.addEventListener('click', function () {
-              var next = ask('Введите новое имя поля:', table.name);
+              var next = ask('Новое имя поля:', table.name);
               if (!next) return;
               tab.tables[i].name = next;
               persist(maps);
@@ -3179,7 +3179,7 @@
           var addField = dom.el('button', { type: 'button', class: 'cwb-btn', text: '+' });
           addField.addEventListener('click', function () {
             if (tab.tables.length >= MAX_FIELDS) return;
-            var name = ask('Введите имя поля:');
+            var name = ask('Имя поля:');
             if (!name) return;
             tab.tables.push(emptyTable(name));
             tab.currentTable = tab.tables.length - 1;
@@ -3199,10 +3199,10 @@
         importBtn.addEventListener('click', function () {
           var imported = uwu.importClimbingMaps();
           if (!imported) {
-            window.alert('Карт UwU в localStorage нет (ключ uwu_climbingPanelState). Если у них включено единое хранилище GM — мы его прочитать не можем.');
+            window.alert('Карт UwU в localStorage нет. Если у них включено единое хранилище Tampermonkey — мы его не видим.');
             return;
           }
-          if (!window.confirm('Заменить наши карты ЛУ картами из UwU? Пишем только в cwb:climbing-maps, их стор не трогаем.')) return;
+          if (!window.confirm('Заменить наши карты ЛУ картами из UwU? Их карты не трогаем, пишем только к себе.')) return;
           persist(normalizeMaps(imported));
         });
         importRow.appendChild(importBtn);
@@ -3358,7 +3358,7 @@
     module.exports = {
       id: 'climbing-field',
       title: 'Поле для ЛУ',
-      description: 'Минное поле 10×6 со вкладками и полями-локациями: цифры треска, мины и переходы. Карты сохраняются между обновлениями.',
+      description: 'Минное поле 10×6: вкладки, локации, цифры треска, мины и переходы. Карты не слетают после обновления.',
       category: 'field',
       pages: ['game'],
       enabledByDefault: false,
@@ -3381,25 +3381,25 @@
           key: 'overlay',
           type: 'boolean',
           label: 'Дублировать пометки на игровом поле',
-          hint: 'Если в UwU включён перенос заливки на поле — наш оверлей не дублируем.',
+          hint: 'Если в UwU уже переносится заливка на поле — нашу не рисуем.',
         },
         {
           key: 'blockDangerous',
           type: 'boolean',
           label: 'Кач ЛУ: не нажимать на опасные клетки',
-          hint: 'Глушит клик и ходьбу с клавиатуры (WASD, QEZX) по минам, опаскам и unsafe. Выключите, чтобы ходить как обычно.',
+          hint: 'Не даёт кликнуть и пойти с клавиатуры (WASD, QEZX) на мины, опаски и unsafe. Выключи, если хочешь ходить как обычно.',
         },
         {
           key: 'autoFromServer',
           type: 'boolean',
           label: 'Подтягивать ярусы деревьев из игры',
-          hint: 'Если сервер прислал field.map[y][x].tree — пустые клетки заполнятся сами.',
+          hint: 'Если игра уже знает ярус — пустые клетки заполнятся сами.',
         },
         {
           key: 'autoFromChat',
           type: 'boolean',
           label: 'Ставить цифру в клетку кота по треску в чате',
-          hint: 'Сообщение [треск] (msg.volume 0–7) → клетка, где стоит ваш кот. Не любые системные реплики.',
+          hint: 'Берёт громкость из [треск] (0–7) и ставит в клетку, где стоит твой кот. Обычные системные реплики не считает.',
         },
         {
           key: 'showSkill',
@@ -3410,13 +3410,13 @@
           key: 'clearOnLocation',
           type: 'boolean',
           label: 'Очищать текущее поле при смене локации',
-          hint: 'По умолчанию выключено: карты хранятся во вкладках и полях и переживают обновление страницы.',
+          hint: 'По умолчанию выключено. Карты лежат во вкладках и не пропадают после обновления.',
         },
         {
           key: 'mapsEditor',
           type: 'custom',
           label: 'Вкладки и поля',
-          hint: 'Добавить, удалить или переименовать вкладки и таблицы-поля внутри выбранной вкладки.',
+          hint: 'Добавить, удалить или переименовать вкладки и таблицы внутри выбранной вкладки.',
           render: renderMapsEditor,
         },
       ],
@@ -3536,7 +3536,7 @@
           dom.el('h3', { text: 'Локация' }),
           fieldsEl,
         ]);
-        var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавьте поле/таблицу в настройках' });
+        var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавь поле или таблицу в настройках' });
         var trainBtn = dom.el('button', {
           type: 'button',
           id: 'cwb-lu-train',
@@ -3554,7 +3554,7 @@
           table,
           trainBtn,
           tools,
-          dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки и поля настраиваются в панели модов. «Кач ЛУ» глушит клик и WASD по опасным клеткам на поле.' }),
+          dom.el('div', { id: 'cwb-lu-help', text: 'Клавиши 0–7, «-» мина, «=» переход. Вкладки и поля — в панели модов. «Кач ЛУ» не даёт кликнуть и пойти WASD на опасные клетки.' }),
         ]);
 
         var panel = dom.el('div', { id: 'cwb-lu' }, [head, body]);
@@ -4131,7 +4131,7 @@
     module.exports = {
       id: 'clock',
       title: 'Часы',
-      description: 'Плавающие часы: реальное время и, по желанию, игровой час и сезон.',
+      description: 'Плавающие часы. Реальное время, по желанию ещё игровой час и сезон.',
       category: 'interface',
       pages: ['game', 'hunt', 'chat', 'pm'],
       enabledByDefault: false,
@@ -4158,7 +4158,7 @@
           ],
         },
         { key: 'showSeconds', type: 'boolean', label: 'Показывать секунды' },
-        { key: 'showGameHour', type: 'boolean', label: 'Игровой час', hint: 'Читается из Vue (weather.hour), только на игровой странице.' },
+        { key: 'showGameHour', type: 'boolean', label: 'Игровой час', hint: 'Только на игровой странице.' },
         { key: 'showSeason', type: 'boolean', label: 'Игровой сезон' },
         { key: 'fontSize', type: 'number', label: 'Размер шрифта, px', min: 9, max: 40, step: 1 },
       ],
@@ -4178,7 +4178,7 @@
 
         var main = dom.el('span', { class: 'cwb-clock-main' });
         var sub = dom.el('span', { class: 'cwb-clock-sub' });
-        var node = dom.el('div', { id: 'cwb-clock', title: 'Часы CatWar Balconette — можно перетащить' }, [main, sub]);
+        var node = dom.el('div', { id: 'cwb-clock', title: 'Можно перетащить' }, [main, sub]);
 
         // Положение: сохранённое или по умолчанию сверху слева.
         if (typeof s.x === 'number' && typeof s.y === 'number') {
@@ -4301,7 +4301,7 @@
     module.exports = {
       id: 'copy-id',
       title: 'Копирование ID',
-      description: 'Копирует ID по клику на строку «Уникальный ID» в меню предмета или на подпись ID. Клик по иконке предмета меню не ломает.',
+      description: 'Клик по строке «Уникальный ID» в меню предмета или по подписи ID копирует число. По иконке предмета меню не ломается.',
       category: 'info',
       pages: ['game', 'pm', 'profile'],
       enabledByDefault: false,
@@ -4316,7 +4316,7 @@
           key: 'requireAlt',
           type: 'boolean',
           label: 'Только с зажатым Alt',
-          hint: 'Если выключено — копирование по обычному клику на строку ID, не на иконку предмета.',
+          hint: 'Без галочки копируется обычным кликом по строке ID, не по иконке.',
         },
       ],
 
@@ -4561,7 +4561,7 @@
     var mod = {
       id: 'domain-redirect',
       title: 'Редирект catwar.net → .su',
-      description: 'Открывает catwar.su вместо устаревшего catwar.net и чинит ссылки, картинки и запросы. Включён по умолчанию.',
+      description: 'Кидает с catwar.net на catwar.su и чинит ссылки, картинки и запросы. По умолчанию включён.',
       category: 'misc',
       pages: ['*'],
       early: true,
@@ -4580,19 +4580,19 @@
           key: 'redirectPage',
           type: 'boolean',
           label: 'Перенаправлять открытие catwar.net',
-          hint: 'Если вкладка сама открылась на catwar.net — location.replace на тот же путь на .su.',
+          hint: 'Если вкладка открылась на catwar.net — кинет на тот же путь на .su.',
         },
         {
           key: 'rewriteDom',
           type: 'boolean',
           label: 'Подменять .net в ссылках и картинках',
-          hint: 'href, src, poster, srcset, style, клики и window.open.',
+          hint: 'Ссылки, картинки, клики и window.open.',
         },
         {
           key: 'interceptNetwork',
           type: 'boolean',
           label: 'Подменять .net в fetch и XHR',
-          hint: 'Не создаёт своих запросов: только меняет адрес уже идущих.',
+          hint: 'Свои запросы не шлёт, только правит адрес у тех, что уже идут.',
         },
       ],
 
@@ -4628,7 +4628,7 @@
     module.exports = {
       id: 'grid',
       title: 'Сетка на поле',
-      description: 'Обозначает границы клеток игрового поля.',
+      description: 'Рисует границы клеток на поле.',
       category: 'field',
       pages: ['game', 'hunt'],
       enabledByDefault: false,
@@ -4751,7 +4751,7 @@
       pages: ['game'],
       enabledByDefault: false,
       order: 40,
-      warning: 'Опция «вся строка погоды» прячет и «Моё местонахождение» — оно лежит в той же строке.',
+      warning: '«Вся строка погоды» прячет ещё и «Моё местонахождение» — оно в той же строке.',
 
       defaults: {
         sky: true,
@@ -4762,15 +4762,15 @@
       },
 
       schema: [
-        { key: 'sky', type: 'boolean', label: 'Небо над полем (#tr_sky)' },
-        { key: 'tos', type: 'boolean', label: 'Полоска температуры (#tos)' },
-        { key: 'hour', type: 'boolean', label: 'Иконка игрового часа (#hour)' },
+        { key: 'sky', type: 'boolean', label: 'Небо над полем' },
+        { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
+        { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
         { key: 'season', type: 'boolean', label: 'Иконка сезона' },
         {
           key: 'wholeRow',
           type: 'boolean',
-          label: 'Вся строка погоды (#tr_tos)',
-          hint: 'Перебивает опции выше. В компактном режиме заодно скроет название локации.',
+          label: 'Вся строка погоды',
+          hint: 'Перебивает галочки выше. В компакте ещё спрячет название локации.',
         },
       ],
 
@@ -4864,7 +4864,7 @@
     module.exports = {
       id: 'history-autoscroll',
       title: 'Автопрокрутка истории',
-      description: 'Держит блок истории (#ist) прокрученным к последней записи.',
+      description: 'Держит историю прокрученной к последней записи.',
       category: 'info',
       pages: ['game'],
       enabledByDefault: false,
@@ -4881,7 +4881,7 @@
           key: 'respectUserScroll',
           type: 'boolean',
           label: 'Не мешать, если прокрутил вверх',
-          hint: 'Автопрокрутка возобновится, как только вернётесь к низу списка.',
+          hint: 'Автопрокрутка вернётся, как только снова окажешься внизу.',
         },
         { key: 'threshold', type: 'number', label: 'Зона «у низа», px', min: 0, max: 600, step: 10 },
         { key: 'smooth', type: 'boolean', label: 'Плавная прокрутка' },
@@ -4981,7 +4981,7 @@
     module.exports = {
       id: 'hunt-smell-square',
       title: 'Подсказка по запаху (охота)',
-      description: 'На /cw3/jagd: «Ближе» / «Дальше» / «Потерян» по цвету квадрата запаха и таймер.',
+      description: 'На охоте пишет «Ближе», «Дальше» или «Потерян» по цвету квадрата запаха. Ещё таймер.',
       category: 'info',
       pages: ['hunt'],
       enabledByDefault: false,
@@ -5107,7 +5107,7 @@
     module.exports = {
       id: 'layout-swap',
       title: 'Поменять кот ↔ действия',
-      description: 'Сначала выбор соседнего кота (#mit), затем иконки действий (#akten).',
+      description: 'Сначала выбор соседнего кота, потом иконки действий.',
       category: 'interface',
       pages: ['game'],
       enabledByDefault: false,
@@ -5166,7 +5166,7 @@
     module.exports = {
       id: 'mouth-cat-ids',
       title: 'ID котов во рту',
-      description: 'Показывает числовой ID каждого кота, которого держите во рту.',
+      description: 'Числовой ID каждого кота, которого держишь во рту.',
       category: 'info',
       pages: ['game'],
       enabledByDefault: false,
@@ -5331,7 +5331,7 @@
     module.exports = {
       id: 'notifications',
       title: 'Уведомления',
-      description: 'Браузерные уведомления о новом ЛС и упоминании вашего имени в чате.',
+      description: 'Уведомления браузера про новое ЛС и упоминание в чате.',
       category: 'chat',
       pages: ['game', 'chat'],
       enabledByDefault: false,
@@ -5355,7 +5355,7 @@
           key: '_perm',
           type: 'boolean',
           label: 'Запросить разрешение браузера',
-          hint: 'Включите, чтобы браузер спросил разрешение на уведомления. Не запрашивается автоматически.',
+          hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
         },
       ],
 
@@ -5419,7 +5419,7 @@
                 if (!msg || msg.cat === myId) return;
                 if (/class=["']myname["']/.test(String(msg.text || ''))) {
                   var plain = String(msg.text || '').replace(/<[^>]+>/g, '');
-                  notify((msg.login || 'Чат') + ' упомянул(а) вас', plain, 'mention');
+                  notify((msg.login || 'Чат') + ' упомянул(а) тебя', plain, 'mention');
                 }
               });
             });
@@ -5498,12 +5498,12 @@
     module.exports = {
       id: 'old-icons',
       title: 'Старые иконки действий',
-      description: 'Подменяет картинки кнопок действий на прежние.',
+      description: 'Ставит старые картинки на кнопки действий.',
       category: 'interface',
       pages: ['game'],
       enabledByDefault: false,
       order: 20,
-      warning: 'Встроенный словарь неполный (' + data.count + ' иконок) и ведёт на сторонний хостинг d.zaix.ru. Надёжнее указать свой базовый URL или словарь.',
+      warning: 'Встроенный список неполный (' + data.count + ' иконок) и тянет картинки с d.zaix.ru. Лучше свой URL или свой словарь.',
 
       defaults: {
         source: 'builtin',     // builtin | base | custom
@@ -5530,7 +5530,7 @@
           label: 'Свой словарь',
           placeholder: '{\n  "1": "https://…/1.png",\n  "exchange": "https://…/exchange.png"\n}',
         },
-        { key: 'includeExtra', type: 'boolean', label: 'Подменять и иконку диалога (#dialog > img)' },
+        { key: 'includeExtra', type: 'boolean', label: 'Менять ещё и иконку диалога' },
       ],
 
       styles: function (s) {
@@ -5616,8 +5616,8 @@
 
     module.exports = {
       id: 'param-info',
-      title: 'Информация о параметре',
-      description: 'Карточка с текущим значением, максимумом, уровнем и абсолютным опытом навыка.',
+      title: 'Карточка параметра',
+      description: 'По клику: текущее значение, максимум, уровень и полный опыт навыка.',
       category: 'info',
       pages: ['game'],
       enabledByDefault: false,
@@ -5680,7 +5680,7 @@
             if (!s) return;
             rows.push('<div class="cwb-param-row">Уровень: <b>' + s.level + '</b></div>');
             rows.push('<div class="cwb-param-row">Прогресс: <b>' + s.inLvl + ' / ' + s.span + '</b> (' + (s.barWidth != null ? s.barWidth : '?') + '%)</div>');
-            rows.push('<div class="cwb-param-row">Абсолютный опыт: <b>' + s.abs + '</b></div>');
+            rows.push('<div class="cwb-param-row">Весь опыт: <b>' + s.abs + '</b></div>');
             if (s.toNext != null) rows.push('<div class="cwb-param-row">До след. уровня: <b>' + Math.max(0, Math.round(s.toNext * 100) / 100) + '</b></div>');
             if (d.tooltip) rows.push('<div class="cwb-param-row">Подсказка: ' + dom.escapeHtml(d.tooltip) + '</div>');
           } else {
@@ -5731,7 +5731,7 @@
     module.exports = {
       id: 'pm-ids',
       title: 'ID в личных сообщениях',
-      description: 'Показывает числовой ID рядом с ником в списке и в открытом письме.',
+      description: 'Числовой ID рядом с ником в списке и в открытом письме.',
       category: 'info',
       pages: ['pm'],
       enabledByDefault: false,
@@ -5819,7 +5819,7 @@
     module.exports = {
       id: 'skill-fractions',
       title: 'Дроби на навыках',
-      description: 'Показывает опыт навыка на полоске (673/2000), как подписи в блоке «Состояние».',
+      description: 'Опыт навыка на полоске (673/2000), как в блоке «Состояние».',
       category: 'info',
       pages: ['game'],
       enabledByDefault: false,
@@ -5963,15 +5963,15 @@
       schema: [
         { key: 'volume', type: 'range', label: 'Громкость', min: 0.05, max: 1, step: 0.05 },
         { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение (бейдж ЛС)' },
-        { key: 'onMention', type: 'boolean', label: 'Упоминание вашего имени в чате' },
+        { key: 'onMention', type: 'boolean', label: 'Упоминание твоего имени в чате' },
         { key: 'onActionEnd', type: 'boolean', label: 'Конец действия / перехода' },
         { key: 'onMapChange', type: 'boolean', label: 'Смена локации (карта)' },
         { key: 'onChat', type: 'boolean', label: 'Новое сообщение в общем чате (бейдж)' },
         {
           key: 'customUrl',
           type: 'text',
-          label: 'URL своего звука (необяз.)',
-          hint: 'Если указан — проигрывается вместо синтеза для всех событий.',
+          label: 'Ссылка на свой звук (необязательно)',
+          hint: 'Если есть — играет вместо встроенного звука на все события.',
         },
       ],
 
@@ -6106,7 +6106,7 @@
           type: 'select',
           label: 'Что менять',
           options: [
-            { value: 'field', label: 'Только фон локации (#cages_div)' },
+            { value: 'field', label: 'Только фон локации' },
             { value: 'page', label: 'Только фон страницы' },
             { value: 'both', label: 'И то, и другое' },
           ],
@@ -6126,7 +6126,7 @@
           key: 'disableSeasonalCss',
           type: 'boolean',
           label: 'Отключить сезонный скин сайта',
-          hint: 'Гасит подключённые стили /design/… — шапку, боковины и фон оформления.',
+          hint: 'Убирает сезонные стили: шапку, боковины и фон оформления.',
         },
       ],
 

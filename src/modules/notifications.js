@@ -14,7 +14,7 @@ var PERM_BTN = 'cwb-notify-perm';
 module.exports = {
   id: 'notifications',
   title: 'Уведомления',
-  description: 'Браузерные уведомления о новом ЛС и упоминании вашего имени в чате.',
+  description: 'Уведомления браузера про новое ЛС и упоминание в чате.',
   category: 'chat',
   pages: ['game', 'chat'],
   enabledByDefault: false,
@@ -38,7 +38,7 @@ module.exports = {
       key: '_perm',
       type: 'boolean',
       label: 'Запросить разрешение браузера',
-      hint: 'Включите, чтобы браузер спросил разрешение на уведомления. Не запрашивается автоматически.',
+      hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
     },
   ],
 
@@ -102,7 +102,7 @@ module.exports = {
             if (!msg || msg.cat === myId) return;
             if (/class=["']myname["']/.test(String(msg.text || ''))) {
               var plain = String(msg.text || '').replace(/<[^>]+>/g, '');
-              notify((msg.login || 'Чат') + ' упомянул(а) вас', plain, 'mention');
+              notify((msg.login || 'Чат') + ' упомянул(а) тебя', plain, 'mention');
             }
           });
         });

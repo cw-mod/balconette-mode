@@ -22,7 +22,7 @@ module.exports = {
   pages: ['game'],
   enabledByDefault: false,
   order: 40,
-  warning: 'Опция «вся строка погоды» прячет и «Моё местонахождение» — оно лежит в той же строке.',
+  warning: '«Вся строка погоды» прячет ещё и «Моё местонахождение» — оно в той же строке.',
 
   defaults: {
     sky: true,
@@ -33,15 +33,15 @@ module.exports = {
   },
 
   schema: [
-    { key: 'sky', type: 'boolean', label: 'Небо над полем (#tr_sky)' },
-    { key: 'tos', type: 'boolean', label: 'Полоска температуры (#tos)' },
-    { key: 'hour', type: 'boolean', label: 'Иконка игрового часа (#hour)' },
+    { key: 'sky', type: 'boolean', label: 'Небо над полем' },
+    { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
+    { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
     { key: 'season', type: 'boolean', label: 'Иконка сезона' },
     {
       key: 'wholeRow',
       type: 'boolean',
-      label: 'Вся строка погоды (#tr_tos)',
-      hint: 'Перебивает опции выше. В компактном режиме заодно скроет название локации.',
+      label: 'Вся строка погоды',
+      hint: 'Перебивает галочки выше. В компакте ещё спрячет название локации.',
     },
   ],
 

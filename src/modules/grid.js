@@ -12,7 +12,7 @@ var dom = require('core/dom');
 module.exports = {
   id: 'grid',
   title: 'Сетка на поле',
-  description: 'Обозначает границы клеток игрового поля.',
+  description: 'Рисует границы клеток на поле.',
   category: 'field',
   pages: ['game', 'hunt'],
   enabledByDefault: false,

@@ -26,7 +26,7 @@ var SCHEMA = [
       { value: 'top-left', label: 'Вверху слева' },
     ],
   },
-  { key: 'gearHidden', type: 'boolean', label: 'Спрятать кнопку-шестерёнку', hint: 'Панель останется доступной по Ctrl+Alt+B' },
+  { key: 'gearHidden', type: 'boolean', label: 'Спрятать кнопку-шестерёнку', hint: 'Панель всё равно откроется по Ctrl+Alt+B' },
   { key: 'hotkey', type: 'boolean', label: 'Открывать панель по Ctrl+Alt+B' },
   {
     key: 'logLevel',
@@ -44,7 +44,7 @@ var SCHEMA = [
     key: 'socketHook',
     type: 'boolean',
     label: 'Хук игрового сокета (экспериментально)',
-    hint: 'Нужен только будущим модулям. Требует перезагрузки страницы. Ничего не отправляет на сервер.',
+    hint: 'Пока никому не нужен. После включения перезагрузи страницу. На сервер ничего не шлёт.',
   },
 ];
 

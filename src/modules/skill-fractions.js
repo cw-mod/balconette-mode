@@ -36,7 +36,7 @@ function skillFraction(parameter, key) {
 module.exports = {
   id: 'skill-fractions',
   title: 'Дроби на навыках',
-  description: 'Показывает опыт навыка на полоске (673/2000), как подписи в блоке «Состояние».',
+  description: 'Опыт навыка на полоске (673/2000), как в блоке «Состояние».',
   category: 'info',
   pages: ['game'],
   enabledByDefault: false,

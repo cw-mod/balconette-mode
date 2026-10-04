@@ -12,7 +12,7 @@ var SEL_CATROT = SEL_ITEM_LIST + ' .catrot';
 module.exports = {
   id: 'mouth-cat-ids',
   title: 'ID котов во рту',
-  description: 'Показывает числовой ID каждого кота, которого держите во рту.',
+  description: 'Числовой ID каждого кота, которого держишь во рту.',
   category: 'info',
   pages: ['game'],
   enabledByDefault: false,

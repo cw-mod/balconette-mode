@@ -42,7 +42,7 @@ module.exports = {
       type: 'select',
       label: 'Что менять',
       options: [
-        { value: 'field', label: 'Только фон локации (#cages_div)' },
+        { value: 'field', label: 'Только фон локации' },
         { value: 'page', label: 'Только фон страницы' },
         { value: 'both', label: 'И то, и другое' },
       ],
@@ -62,7 +62,7 @@ module.exports = {
       key: 'disableSeasonalCss',
       type: 'boolean',
       label: 'Отключить сезонный скин сайта',
-      hint: 'Гасит подключённые стили /design/… — шапку, боковины и фон оформления.',
+      hint: 'Убирает сезонные стили: шапку, боковины и фон оформления.',
     },
   ],
 

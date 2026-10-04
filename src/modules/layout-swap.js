@@ -16,7 +16,7 @@ var MARKER = 'cwb-layout-swap';
 module.exports = {
   id: 'layout-swap',
   title: 'Поменять кот ↔ действия',
-  description: 'Сначала выбор соседнего кота (#mit), затем иконки действий (#akten).',
+  description: 'Сначала выбор соседнего кота, потом иконки действий.',
   category: 'interface',
   pages: ['game'],
   enabledByDefault: false,

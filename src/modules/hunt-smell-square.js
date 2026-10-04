@@ -21,7 +21,7 @@ function parseRed(color) {
 module.exports = {
   id: 'hunt-smell-square',
   title: 'Подсказка по запаху (охота)',
-  description: 'На /cw3/jagd: «Ближе» / «Дальше» / «Потерян» по цвету квадрата запаха и таймер.',
+  description: 'На охоте пишет «Ближе», «Дальше» или «Потерян» по цвету квадрата запаха. Ещё таймер.',
   category: 'info',
   pages: ['hunt'],
   enabledByDefault: false,

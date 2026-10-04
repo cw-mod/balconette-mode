@@ -163,7 +163,7 @@ function applySettings(ctx) {
 var mod = {
   id: 'domain-redirect',
   title: 'Редирект catwar.net → .su',
-  description: 'Открывает catwar.su вместо устаревшего catwar.net и чинит ссылки, картинки и запросы. Включён по умолчанию.',
+  description: 'Кидает с catwar.net на catwar.su и чинит ссылки, картинки и запросы. По умолчанию включён.',
   category: 'misc',
   pages: ['*'],
   early: true,
@@ -182,19 +182,19 @@ var mod = {
       key: 'redirectPage',
       type: 'boolean',
       label: 'Перенаправлять открытие catwar.net',
-      hint: 'Если вкладка сама открылась на catwar.net — location.replace на тот же путь на .su.',
+      hint: 'Если вкладка открылась на catwar.net — кинет на тот же путь на .su.',
     },
     {
       key: 'rewriteDom',
       type: 'boolean',
       label: 'Подменять .net в ссылках и картинках',
-      hint: 'href, src, poster, srcset, style, клики и window.open.',
+      hint: 'Ссылки, картинки, клики и window.open.',
     },
     {
       key: 'interceptNetwork',
       type: 'boolean',
       label: 'Подменять .net в fetch и XHR',
-      hint: 'Не создаёт своих запросов: только меняет адрес уже идущих.',
+      hint: 'Свои запросы не шлёт, только правит адрес у тех, что уже идут.',
     },
   ],
 

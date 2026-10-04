@@ -37,7 +37,7 @@ function parseId(text) {
 module.exports = {
   id: 'copy-id',
   title: 'Копирование ID',
-  description: 'Копирует ID по клику на строку «Уникальный ID» в меню предмета или на подпись ID. Клик по иконке предмета меню не ломает.',
+  description: 'Клик по строке «Уникальный ID» в меню предмета или по подписи ID копирует число. По иконке предмета меню не ломается.',
   category: 'info',
   pages: ['game', 'pm', 'profile'],
   enabledByDefault: false,
@@ -52,7 +52,7 @@ module.exports = {
       key: 'requireAlt',
       type: 'boolean',
       label: 'Только с зажатым Alt',
-      hint: 'Если выключено — копирование по обычному клику на строку ID, не на иконку предмета.',
+      hint: 'Без галочки копируется обычным кликом по строке ID, не по иконке.',
     },
   ],
 

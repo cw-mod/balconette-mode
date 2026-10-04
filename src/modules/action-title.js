@@ -33,7 +33,7 @@ function shortMess(text) {
 module.exports = {
   id: 'action-title',
   title: 'Таймер действия в заголовке',
-  description: 'Пока идёт действие, во вкладке браузера пишется, сколько секунд осталось.',
+  description: 'Пока идёт действие, во вкладке браузера видно, сколько осталось.',
   category: 'interface',
   pages: ['game', 'hunt'],
   enabledByDefault: false,
@@ -48,7 +48,7 @@ module.exports = {
       key: 'showName',
       type: 'boolean',
       label: 'Писать название действия рядом со временем',
-      hint: 'Как в CW Shed: «1 мин 12 с / Вылизаться». Если выключено — только время, как в CW Mod.',
+      hint: 'Как в Shed: «1 мин 12 с / Вылизаться». Без галочки — только время, как в CW Mod.',
     },
   ],
 

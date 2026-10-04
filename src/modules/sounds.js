@@ -29,15 +29,15 @@ module.exports = {
   schema: [
     { key: 'volume', type: 'range', label: 'Громкость', min: 0.05, max: 1, step: 0.05 },
     { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение (бейдж ЛС)' },
-    { key: 'onMention', type: 'boolean', label: 'Упоминание вашего имени в чате' },
+    { key: 'onMention', type: 'boolean', label: 'Упоминание твоего имени в чате' },
     { key: 'onActionEnd', type: 'boolean', label: 'Конец действия / перехода' },
     { key: 'onMapChange', type: 'boolean', label: 'Смена локации (карта)' },
     { key: 'onChat', type: 'boolean', label: 'Новое сообщение в общем чате (бейдж)' },
     {
       key: 'customUrl',
       type: 'text',
-      label: 'URL своего звука (необяз.)',
-      hint: 'Если указан — проигрывается вместо синтеза для всех событий.',
+      label: 'Ссылка на свой звук (необязательно)',
+      hint: 'Если есть — играет вместо встроенного звука на все события.',
     },
   ],
 
