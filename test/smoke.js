@@ -700,6 +700,79 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   }
   ['hide-cat-tooltip', 'always-day', 'grid'].forEach(toggleModule);
 
+  console.log('\n10d. Редирект catwar.net');
+  switchTab('new');
+  await sleep(40);
+  check('domain-redirect на «Новых»', !!$('#cwb-root [data-cwb-mod="domain-redirect"]'));
+  var redirSw = $('#cwb-root [data-cwb-mod="domain-redirect"] .cwb-sw input');
+  check('domain-redirect включён по умолчанию', !!(redirSw && redirSw.checked));
+
+  var netLink = window.document.createElement('a');
+  netLink.setAttribute('href', 'https://catwar.net/cw3/probe');
+  window.document.body.appendChild(netLink);
+  await sleep(40);
+  check('observer переписал href .net → .su',
+    netLink.getAttribute('href') === 'https://catwar.su/cw3/probe',
+    netLink.getAttribute('href'));
+
+  var netImg = window.document.createElement('img');
+  netImg.setAttribute('src', 'https://catwar.net/x.png');
+  window.document.body.appendChild(netImg);
+  await sleep(40);
+  check('observer переписал src', netImg.getAttribute('src') === 'https://catwar.su/x.png',
+    netImg.getAttribute('src'));
+
+  var netSet = window.document.createElement('img');
+  netSet.setAttribute('srcset', 'https://catwar.net/a.png 1x, https://catwar.net/b.png 2x');
+  window.document.body.appendChild(netSet);
+  await sleep(40);
+  check('observer переписал srcset',
+    netSet.getAttribute('srcset') === 'https://catwar.su/a.png 1x, https://catwar.su/b.png 2x',
+    netSet.getAttribute('srcset'));
+
+  var netStyle = window.document.createElement('div');
+  netStyle.setAttribute('style', 'background:url(https://catwar.net/bg.jpg)');
+  window.document.body.appendChild(netStyle);
+  await sleep(40);
+  var styleVal = netStyle.getAttribute('style') || '';
+  check('observer переписал style', /catwar\.su/.test(styleVal) && !/catwar\.net/.test(styleVal), styleVal);
+
+  netLink.setAttribute('href', 'https://catwar.net/click-me');
+  netLink.addEventListener('click', function (e) { e.preventDefault(); });
+  netLink.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true }));
+  check('клик переписал href', netLink.getAttribute('href') === 'https://catwar.su/click-me',
+    netLink.getAttribute('href'));
+
+  try {
+    window.open('https://catwar.net/popup');
+    check('window.open не бросил', true);
+  } catch (e) {
+    check('window.open не бросил', false, String(e && e.message || e));
+  }
+
+  try {
+    var xhr = new window.XMLHttpRequest();
+    xhr.open('GET', 'https://catwar.net/api/ping');
+    check('XHR.open не бросил', true);
+  } catch (e) {
+    check('XHR.open не бросил', false, String(e && e.message || e));
+  }
+
+  toggleModule('domain-redirect');
+  await sleep(40);
+  var leftoverLink = window.document.createElement('a');
+  leftoverLink.setAttribute('href', 'https://catwar.net/after-off');
+  window.document.body.appendChild(leftoverLink);
+  await sleep(40);
+  check('после выключения новые href не трогаем',
+    leftoverLink.getAttribute('href') === 'https://catwar.net/after-off',
+    leftoverLink.getAttribute('href'));
+  leftoverLink.remove();
+  netLink.remove();
+  netImg.remove();
+  netSet.remove();
+  netStyle.remove();
+
   console.log('\n11. Ошибки за сессию');
   check('исключений не было', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '));
 

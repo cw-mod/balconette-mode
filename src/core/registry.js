@@ -8,7 +8,8 @@
  *     title: 'Всегда день',
  *     description: 'Убирает ночное затемнение поля.',
  *     category: 'field',                 // см. CATEGORIES
- *     pages: ['game'],                   // на каких страницах поднимать
+ *     pages: ['game'],                   // на каких страницах поднимать; ['*'] — везде
+ *     early: false,                      // true — старт на document-start, до DOM
  *     enabledByDefault: false,
  *     defaults: { color: '#ffffff' },    // значения настроек
  *     schema: [                          // как рисовать настройки в панели
@@ -328,6 +329,14 @@ function resetSettings(id) {
   notifyChange(id, 'settings');
 }
 
+/** Модули с `early: true` — до DOMContentLoaded (редирект и т.п.). */
+function startEarly(page) {
+  currentPage = page;
+  list().forEach(function (mod) {
+    if (mod.early && isEnabled(mod.id) && matchesPage(mod, page)) startModule(mod.id);
+  });
+}
+
 /** Поднимает все включённые модули, подходящие текущей странице. */
 function startAll(page) {
   currentPage = page;
@@ -356,6 +365,7 @@ module.exports = {
   settingsOf: settingsOf,
   setSetting: setSetting,
   resetSettings: resetSettings,
+  startEarly: startEarly,
   startAll: startAll,
   stopAll: stopAll,
   startModule: startModule,

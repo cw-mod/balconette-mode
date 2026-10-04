@@ -86,6 +86,9 @@ function start() {
     try { require('core/socket').install(); } catch (e) { log.root.warn('хук сокета не встал', e); }
   }
 
+  registerModules();
+  registry.startEarly(page);
+
   function mountUi() {
     if (!document.body) {
       setTimeout(mountUi, 80);
@@ -95,8 +98,6 @@ function start() {
   }
 
   dom.ready().then(function () {
-    registerModules();
-
     // Панель монтируем в отдельный контейнер в конце body — не внутрь #app.
     mountUi();
 

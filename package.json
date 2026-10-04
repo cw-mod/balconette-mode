@@ -8,6 +8,6 @@
     "build": "node build.js",
     "watch": "node build.js --watch",
     "check": "node build.js && node --check dist/catwar-balconette.user.js && echo OK",
-    "smoke": "node build.js && node test/smoke.js"
+    "smoke": "node build.js && node test/domain-redirect.js && node test/smoke.js"
   }
 }

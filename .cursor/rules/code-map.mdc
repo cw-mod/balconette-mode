@@ -7,6 +7,8 @@ alwaysApply: true
 
 Сборка: `node build.js` (без зависимостей). Бандл: `dist/` + копия в `docs/`. Версия — `@version` в `src/header.txt`. Новый файл в `src/modules/` подхватывается сам.
 
+Коммиты: сразу логичными кусками вместе с работой (см. project.mdc). Не копить.
+
 ## Где что
 
 | Зона | Путь |
@@ -18,6 +20,7 @@ alwaysApply: true
 | Данные / ID | `param-info`, `skill-fractions`, `mouth-*-ids`, `copy-id`, `pm-ids`, `cell-coords` |
 | Интерфейс | `clock`, `layout-swap`, `action-title`, `history-autoscroll`, `old-icons` |
 | Звук / охота | `sounds`, `notifications`, `hunt-smell-square` |
+| Сайт | `domain-redirect` — catwar.net → catwar.su (вкладка «Новые») |
 | Данные иконок | `src/data/old-icons.js` |
 | Эталон UX | `research/mods/CatWar_UwU/CatWar UwU.user.js` (локально, gitignore) |
 | Разбор модов / DOM | `research/MODS.md`, `research/LIVE_DOM.md` |
