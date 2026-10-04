@@ -445,7 +445,7 @@ module.exports = {
       key: 'overlay',
       type: 'boolean',
       label: 'Дублировать пометки на игровом поле',
-      hint: 'Если в UwU уже переносится заливка на поле — нашу не рисуем.',
+      hint: 'Цвета и цифры на клетках игры — из этой карты, даже если рядом UwU.',
     },
     {
       key: 'blockDangerous',
@@ -523,9 +523,9 @@ module.exports = {
       '#cages td.cage{position:relative;width:100px;}',
       '#cages td.cage[data-cwb-lu-fill]::before{content:"";position:absolute;left:0;top:0;right:0;bottom:0;',
       'z-index:5;pointer-events:none;}',
-      '#cages td.cage[data-cwb-lu-fill="safe"]::before{background:rgba(46,130,50,.28);}',
-      '#cages td.cage[data-cwb-lu-fill="mine"]::before{background:rgba(180,16,16,.32);}',
-      '#cages td.cage[data-cwb-lu-fill="transit"]::before{background:rgba(255,236,140,.3);}',
+      '#cages > tbody > tr > td.cage[data-cwb-lu-fill="safe"]::before{background:rgba(46,130,50,.28) !important;}',
+      '#cages > tbody > tr > td.cage[data-cwb-lu-fill="mine"]::before{background:rgba(180,16,16,.32) !important;}',
+      '#cages > tbody > tr > td.cage[data-cwb-lu-fill="transit"]::before{background:rgba(255,236,140,.3) !important;}',
       '#cages td.cage[data-cwb-lu-block]{cursor:not-allowed;}',
       '#cages td.cage[data-cwb-lu]::after{content:attr(data-cwb-lu);position:absolute;right:2px;bottom:2px;',
       'z-index:40;font:700 12px/1 ui-monospace,Menlo,Consolas,monospace;padding:1px 3px;border-radius:3px;',
@@ -706,7 +706,9 @@ module.exports = {
       paintTrain();
       var tds = ctx.dom.qsa('#cages td.cage');
       var hidden = fieldHidden();
-      var overlayOn = ctx.settings.get('overlay') && !hidden && !require('core/uwu').transferringClimbing();
+      // UwU при «Переносе» красит #cages из СВОЕЙ карты и только мины/переходы.
+      // Нашу карту всё равно выводим — иначе поле остаётся пустым.
+      var overlayOn = ctx.settings.get('overlay') && !hidden;
       var blockOn = ctx.settings.get('blockDangerous') && !hidden;
       if (!overlayOn && !blockOn) {
         tds.forEach(clearFieldMarks);

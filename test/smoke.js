@@ -698,6 +698,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   } else {
     check('кнопка импорта карт UwU найдена', false);
   }
+  window.localStorage.setItem('uwu_climbingPanelStatus', JSON.stringify({ isChecked: true }));
+  var transferBox = window.document.createElement('input');
+  transferBox.type = 'checkbox';
+  transferBox.id = 'uwu-transferCheckbox';
+  transferBox.checked = true;
+  window.document.body.appendChild(transferBox);
+  if (!$('#cwb-root [data-cwb-mod="climbing-field"] .cwb-sw input')?.checked) {
+    toggleModule('climbing-field');
+  }
+  await sleep(350);
+  check('оверлей ЛУ жив при переносе UwU',
+    !!window.document.querySelector('#cages td.cage[data-cwb-lu-fill]'));
+  toggleModule('climbing-field');
   ['hide-cat-tooltip', 'always-day', 'grid'].forEach(toggleModule);
 
   console.log('\n10d. Редирект catwar.net');
