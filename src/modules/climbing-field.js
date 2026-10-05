@@ -472,7 +472,7 @@ module.exports = {
   description: 'Минное поле 10×6: вкладки, локации, цифры треска, мины и переходы. Карты не слетают после обновления.',
   category: 'field',
   pages: ['game'],
-  enabledByDefault: false,
+  enabledByDefault: require('cwb:meta').variant === 'lu',
   order: 25,
 
   defaults: {

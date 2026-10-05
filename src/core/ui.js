@@ -35,7 +35,7 @@ var state = {
   tabsEl: null,
   noteEl: null,
   query: '',
-  tab: 'new',
+  tab: meta.variant === 'lu' ? 'overlay' : 'new',
   open: false,
   offRegistry: null,
   offKeys: [],

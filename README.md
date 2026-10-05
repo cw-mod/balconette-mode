@@ -20,6 +20,7 @@
 4. Открыть `https://catwar.su/cw3/`. В углу появится кнопка-шестерёнка.
 
 Прямая ссылка на скрипт: [catwar-balconette.user.js](https://cw-mod.github.io/balconette-mode/catwar-balconette.user.js).
+Только поле для ЛУ: [catwar-balconette-lu.user.js](https://cw-mod.github.io/balconette-mode/catwar-balconette-lu.user.js).
 
 ### Обновление
 
@@ -27,7 +28,7 @@
 Tampermonkey сам подтягивает новые версии (обычно раз в сутки). Проверить сразу:
 меню расширения → CatWar Balconette → «Проверить обновления».
 
-После правки исходников поднимите `@version` в `src/header.txt`, соберите
+После правки исходников поднимите `@version` в `src/header.txt` и `src/header-lu.txt`, соберите
 `node build.js` и запушьте — страница установки и метафайл обновятся вместе с бандлом.
 
 ### Панель настроек

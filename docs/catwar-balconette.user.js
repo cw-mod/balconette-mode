@@ -2,7 +2,7 @@
 // @name         CatWar Balconette
 // @name:ru      CatWar Balconette
 // @namespace    catwar-balconette
-// @version      0.1.6
+// @version      0.1.7
 // @description  Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
 // @description:ru Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
 // @author       balconette
@@ -30,7 +30,8 @@
 (function () {
   'use strict';
 
-  var CWB_VERSION = "0.1.6";
+  var CWB_VERSION = "0.1.7";
+  var CWB_VARIANT = "full";
   var CWB_MODULE_IDS = ["action-title","always-day","cell-coords","climbing-field","clock","copy-id","domain-redirect","grid","hide-cat-tooltip","hide-weather","highlight-moves","history-autoscroll","hunt-smell-square","layout-swap","mouth-cat-ids","mouth-item-ids","notifications","old-icons","param-info","pm-ids","skill-fractions","sounds","static-background"];
 
   var __factories = Object.create(null);
@@ -39,7 +40,7 @@
   function __def(name, factory) { __factories[name] = factory; }
 
   function require(name) {
-    if (name === "cwb:meta") return { version: CWB_VERSION, moduleIds: CWB_MODULE_IDS.slice() };
+    if (name === "cwb:meta") return { version: CWB_VERSION, variant: CWB_VARIANT, moduleIds: CWB_MODULE_IDS.slice() };
     if (__cache[name]) return __cache[name].exports;
     var factory = __factories[name];
     if (!factory) throw new Error("[CWB] неизвестный модуль: " + name);
@@ -1427,7 +1428,7 @@
       tabsEl: null,
       noteEl: null,
       query: '',
-      tab: 'new',
+      tab: meta.variant === 'lu' ? 'overlay' : 'new',
       open: false,
       offRegistry: null,
       offKeys: [],
@@ -3525,7 +3526,7 @@
       description: 'Минное поле 10×6: вкладки, локации, цифры треска, мины и переходы. Карты не слетают после обновления.',
       category: 'field',
       pages: ['game'],
-      enabledByDefault: false,
+      enabledByDefault: require('cwb:meta').variant === 'lu',
       order: 25,
 
       defaults: {
