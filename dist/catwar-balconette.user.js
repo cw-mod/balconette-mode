@@ -2282,52 +2282,167 @@
       return parts.filter(Boolean).join(' ');
     }
 
+    /** JSON.parse до трёх раз: UwU иногда кладёт уже строку, а экспорт — строку строки. */
+    function parseMaybe(value) {
+      var v = value;
+      var n;
+      for (n = 0; n < 3 && typeof v === 'string'; n++) {
+        var s = v.trim();
+        if (!s) return null;
+        try { v = JSON.parse(s); } catch (e) { return null; }
+      }
+      return v;
+    }
+
+    /** Массив, строка с JSON-массивом или объект с ключами "0","1",… */
+    function asList(value) {
+      var v = typeof value === 'string' ? parseMaybe(value) : value;
+      if (Array.isArray(v)) return v;
+      if (!v || typeof v !== 'object') return [];
+      var keys = Object.keys(v).filter(function (k) { return /^\d+$/.test(k); });
+      if (!keys.length) return [];
+      keys.sort(function (a, b) { return Number(a) - Number(b); });
+      var list = [];
+      for (var i = 0; i < keys.length; i++) list.push(v[keys[i]]);
+      return list;
+    }
+
+    function cellText(cell) {
+      var v = cell;
+      if (v && typeof v === 'object') {
+        if (v.value != null) v = v.value;
+        else if (v.val != null) v = v.val;
+        else return '';
+      }
+      if (typeof v === 'number' && isFinite(v)) v = String(v);
+      return typeof v === 'string' ? v : '';
+    }
+
+    function isCellRow(item) {
+      if (Array.isArray(item)) return true;
+      var nested = asList(item);
+      return nested.length > 1;
+    }
+
+    /**
+     * Сетка UwU: 6 рядов по 10 клеток `{ value }`, либо плоский список из 60.
+     * «mine» / «transit» оставляем как есть — панель сама рисует X и =.
+     */
     function flattenUwuTable(data) {
+      var src = typeof data === 'string' ? parseMaybe(data) : data;
       var flat = [];
       var y;
       var x;
-      if (!Array.isArray(data)) return flat;
+      if (Array.isArray(src) && src.length === 60 && !isCellRow(src[0])) {
+        for (x = 0; x < 60; x++) flat.push(cellText(src[x]));
+        return flat;
+      }
+      var rows = asList(src);
+      if (!rows.length) return flat;
       for (y = 0; y < 6; y++) {
-        var row = data[y];
-        for (x = 0; x < 10; x++) {
-          var cell = row && row[x];
-          var v = cell && typeof cell === 'object' ? cell.value : cell;
-          flat.push(typeof v === 'string' ? v : '');
-        }
+        var cells = asList(rows[y]);
+        for (x = 0; x < 10; x++) flat.push(cellText(cells[x]));
       }
       return flat;
     }
 
+    function tableName(t, j) {
+      if (!t || typeof t !== 'object' || Array.isArray(t)) return 'Поле ' + (j + 1);
+      var name = t.name || t.title || t.location || t.label;
+      name = name == null ? '' : String(name).trim();
+      return name || ('Поле ' + (j + 1));
+    }
+
+    function clampIndex(n, len) {
+      if (typeof n !== 'number' || n < 0 || n >= len) return 0;
+      return n;
+    }
+
     /**
-     * Карты минника UwU → наш формат cwb:climbing-maps.
-     * Ничего не пишет: вызывающий сам кладёт в наш стор.
+     * Состояние панели или весь экспорт настроек UwU
+     * (`{ uwu_climbingPanelState, uwu_climbingPanelStatus, ... }`).
      */
-    function importClimbingMaps() {
-      var raw = readJson('uwu_climbingPanelState');
-      if (!raw || !Array.isArray(raw.tabs) || !raw.tabs.length) return null;
-      var tabs = raw.tabs.map(function (tab, i) {
+    function mapsFromUnknown(value, statusFallback) {
+      var val = parseMaybe(value);
+      if (!val || typeof val !== 'object') return null;
+      var state = val;
+      var status = statusFallback || null;
+      if (val.uwu_climbingPanelState != null) {
+        state = parseMaybe(val.uwu_climbingPanelState);
+        if (!status && val.uwu_climbingPanelStatus != null) status = parseMaybe(val.uwu_climbingPanelStatus);
+      }
+      if (!state || typeof state !== 'object') return null;
+      var tabList = asList(state.tabs);
+      if (!tabList.length) return null;
+
+      var currentTab = typeof state.currentTabIndex === 'number' ? state.currentTabIndex
+        : typeof state.currentTab === 'number' ? state.currentTab : 0;
+      var liveTable = typeof state.currentTableId === 'number' ? state.currentTableId : null;
+      if (status && typeof status === 'object') {
+        if (typeof status.currentTabIndex === 'number') currentTab = status.currentTabIndex;
+        if (typeof status.currentTableId === 'number') liveTable = status.currentTableId;
+      }
+
+      var tabs = tabList.map(function (tab, i) {
         var tables = [];
-        var list = Array.isArray(tab.tables) ? tab.tables : [];
-        list.forEach(function (t, j) {
+        asList(tab && tab.tables).forEach(function (t, j) {
+          var gridSrc = t && (t.data != null ? t.data : t.grid != null ? t.grid : t.cells);
           tables.push({
-            name: String((t && t.name) || ('Поле ' + (j + 1))),
-            grid: flattenUwuTable(t && t.data),
+            name: tableName(t, j),
+            grid: flattenUwuTable(gridSrc),
           });
         });
         if (!tables.length) tables.push({ name: 'Поле 1', grid: flattenUwuTable(null) });
         var currentTable = typeof tab.currentTableId === 'number' ? tab.currentTableId
           : typeof tab.currentTable === 'number' ? tab.currentTable : 0;
-        if (currentTable < 0 || currentTable >= tables.length) currentTable = 0;
+        if (i === currentTab && liveTable != null) currentTable = liveTable;
+        currentTable = clampIndex(currentTable, tables.length);
         return {
-          name: String((tab && tab.name) || ('Вкладка ' + (i + 1))),
+          name: String((tab && tab.name) || ('Вкладка ' + (i + 1))).trim() || ('Вкладка ' + (i + 1)),
           currentTable: currentTable,
           tables: tables,
         };
       });
-      var currentTab = typeof raw.currentTabIndex === 'number' ? raw.currentTabIndex
-        : typeof raw.currentTab === 'number' ? raw.currentTab : 0;
-      if (currentTab < 0 || currentTab >= tabs.length) currentTab = 0;
+      currentTab = clampIndex(currentTab, tabs.length);
       return { version: 2, currentTab: currentTab, tabs: tabs };
+    }
+
+    function climbingMapsHaveMarks(maps) {
+      if (!maps || !Array.isArray(maps.tabs)) return false;
+      for (var i = 0; i < maps.tabs.length; i++) {
+        var tables = maps.tabs[i].tables || [];
+        for (var j = 0; j < tables.length; j++) {
+          var grid = tables[j].grid || [];
+          for (var k = 0; k < grid.length; k++) {
+            if (grid[k]) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Карты минника UwU → наш формат cwb:climbing-maps.
+     * Сначала localStorage. Если на странице открыты настройки UwU и в поле
+     * «Экспорт» клеток больше (единое хранилище не пишет свежие карты в localStorage),
+     * берём экспорт. Ничего не пишет: вызывающий сам кладёт в наш стор.
+     */
+    function importClimbingMaps() {
+      var fromStore = mapsFromUnknown(readJson('uwu_climbingPanelState'), readJson('uwu_climbingPanelStatus'));
+      var fromDom = null;
+      try {
+        var field = document.getElementById('exportSettings');
+        if (field && field.value) fromDom = mapsFromUnknown(field.value);
+      } catch (e) { /* нет DOM */ }
+      if (!fromStore) return fromDom;
+      if (fromDom && !climbingMapsHaveMarks(fromStore) && climbingMapsHaveMarks(fromDom)) return fromDom;
+      return fromStore;
+    }
+
+    /** Вставка из поля «Экспорт» UwU или голый объект панели. */
+    function climbingMapsFromExport(text) {
+      if (text == null || !String(text).trim()) return null;
+      return mapsFromUnknown(String(text));
     }
 
     module.exports = {
@@ -2352,6 +2467,8 @@
       tabOf: tabOf,
       hintFor: hintFor,
       importClimbingMaps: importClimbingMaps,
+      climbingMapsFromExport: climbingMapsFromExport,
+      climbingMapsHaveMarks: climbingMapsHaveMarks,
     };
   });
 
@@ -3190,6 +3307,46 @@
         wrap.appendChild(fieldRow);
 
         var uwu = require('core/uwu');
+        wrap.appendChild(dom.el('h4', { text: 'Импорт из UwU' }));
+        var paste = dom.el('textarea', {
+          class: 'cwb-maps-paste',
+          placeholder: 'Вставь экспорт настроек UwU целиком — их поле «Экспорт»',
+          style: {
+            width: '100%',
+            minHeight: '72px',
+            boxSizing: 'border-box',
+            padding: '6px 8px',
+            border: '1px solid #d6cbb8',
+            borderRadius: '6px',
+            fontFamily: 'ui-monospace, Menlo, Consolas, monospace',
+            fontSize: '12px',
+            resize: 'vertical',
+          },
+        });
+        wrap.appendChild(paste);
+        var pasteRow = dom.el('div', { class: 'cwb-maps-row' });
+        var pasteBtn = dom.el('button', {
+          type: 'button',
+          class: 'cwb-btn',
+          text: 'Забрать карты из экспорта',
+        });
+        pasteBtn.addEventListener('click', function () {
+          var imported = uwu.climbingMapsFromExport(paste.value);
+          if (!imported) {
+            window.alert('В вставке нет карт минника. Нужен экспорт настроек UwU целиком (в нём есть uwu_climbingPanelState) или сам объект с вкладками.');
+            return;
+          }
+          if (!window.confirm('Заменить наши карты ЛУ картами из экспорта UwU? Их карты не трогаем, пишем только к себе.')) return;
+          persist(normalizeMaps(imported));
+          paste.value = '';
+        });
+        pasteRow.appendChild(pasteBtn);
+        pasteRow.appendChild(dom.el('span', {
+          class: 'cwb-opt-hint',
+          text: 'Так забираются названия локаций и клетки. Единое хранилище UwU в localStorage их не кладёт.',
+        }));
+        wrap.appendChild(pasteRow);
+
         var importRow = dom.el('div', { class: 'cwb-maps-row' });
         var importBtn = dom.el('button', {
           type: 'button',
@@ -3199,19 +3356,26 @@
         importBtn.addEventListener('click', function () {
           var imported = uwu.importClimbingMaps();
           if (!imported) {
-            window.alert('Карт UwU в localStorage нет. Если у них включено единое хранилище Tampermonkey — мы его не видим.');
+            window.alert('Карт UwU в localStorage нет. Вставь экспорт из их настроек в поле выше.');
             return;
           }
-          if (!window.confirm('Заменить наши карты ЛУ картами из UwU? Их карты не трогаем, пишем только к себе.')) return;
+          var empty = !uwu.climbingMapsHaveMarks(imported);
+          var question = empty
+            ? 'В localStorage UwU карты без клеток — часто это старая копия при едином хранилище. Названия локаций и клетки лежат в экспорте, вставь его в поле выше. Всё равно заменить наши карты этой копией?'
+            : 'Заменить наши карты ЛУ картами из UwU? Их карты не трогаем, пишем только к себе.';
+          if (!window.confirm(question)) return;
           persist(normalizeMaps(imported));
         });
         importRow.appendChild(importBtn);
         if (uwu.present()) {
+          var stored = uwu.importClimbingMaps();
           importRow.appendChild(dom.el('span', {
             class: 'cwb-opt-hint',
-            text: uwu.importClimbingMaps()
-              ? 'Найдены карты UwU в localStorage.'
-              : 'UwU рядом, но карт минника в localStorage нет.',
+            text: stored
+              ? (uwu.climbingMapsHaveMarks(stored)
+                ? 'Найдены карты UwU в localStorage.'
+                : 'В localStorage UwU карты без клеток. Вставь их экспорт выше.')
+              : 'UwU рядом, но карт минника в localStorage нет. Вставь их экспорт выше.',
           }));
         }
         wrap.appendChild(importRow);
@@ -3370,6 +3534,7 @@
         autoFromChat: true,
         showSkill: true,
         blockDangerous: true,
+        uwuSync: 'off',
         collapsed: false,
         x: null,
         y: null,
@@ -3388,6 +3553,17 @@
           type: 'boolean',
           label: 'Кач ЛУ: не нажимать на опасные клетки',
           hint: 'Не даёт кликнуть и пойти с клавиатуры (WASD, QEZX) на мины, опаски и unsafe. Выключи, если хочешь ходить как обычно.',
+        },
+        {
+          key: 'uwuSync',
+          type: 'select',
+          label: 'Живая карта UwU',
+          hint: 'Новая пометка сразу пишется в открытую таблицу UwU, без экспорта. «Только UwU» прячет нашу панель и вешает «Кач ЛУ» на их минник.',
+          options: [
+            { value: 'off', label: 'Не синхронизировать' },
+            { value: 'both', label: 'Писать и к нам, и в UwU' },
+            { value: 'uwu', label: 'Только в UwU, нашу панель скрыть' },
+          ],
         },
         {
           key: 'autoFromServer',
@@ -3453,6 +3629,9 @@
           '#cwb-lu-train{display:block;width:100%;margin:6px 0 0;height:22px;padding:0 6px;border:1px solid #6a5d4c;',
           'border-radius:4px;background:#3a332b;color:#f3e7d3;cursor:pointer;font:11px/20px inherit;}',
           '#cwb-lu-train.active{background:#e8c27a;color:#2a1f12;border-color:#e8c27a;}',
+          '#cwb-lu-train-uwu{margin-left:8px;height:22px;padding:0 8px;border:1px solid #6a5d4c;border-radius:4px;',
+          'background:#3a332b;color:#f3e7d3;cursor:pointer;font:11px/20px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
+          '#cwb-lu-train-uwu.active{background:#e8c27a;color:#2a1f12;border-color:#e8c27a;}',
           '#cwb-lu-tools{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;}',
           '#cwb-lu-tools button{min-width:22px;height:20px;padding:0 5px;border:1px solid #6a5d4c;',
           'border-radius:4px;background:#3a332b;color:#f3e7d3;cursor:pointer;font:11px/18px inherit;}',
@@ -3574,6 +3753,159 @@
           ctx.storage.set(STORAGE_KEY, maps);
         }
 
+        var shadow = emptyGrid();
+        var pulling = false;
+        var pushedAt = [];
+        var seenUwuTable = null;
+
+        function syncMode() {
+          var mode = ctx.settings.get('uwuSync');
+          return mode === 'both' || mode === 'uwu' ? mode : 'off';
+        }
+
+        function uwuTable() {
+          return document.getElementById('uwu-climbingPanel');
+        }
+
+        function uwuCellList() {
+          var table = uwuTable();
+          if (!table) return null;
+          var list = table.querySelectorAll('td');
+          return list.length >= ROWS * COLS ? list : null;
+        }
+
+        function markAt(i) {
+          if (syncMode() === 'uwu') {
+            var list = uwuCellList();
+            if (list && list[i]) {
+              var live = normalizeMark(list[i].dataset.value || '');
+              if (live) return live;
+            }
+            return shadow[i] || '';
+          }
+          var grid = currentGrid();
+          return grid[i] || '';
+        }
+
+        /**
+         * UwU пишет клетку в своё хранилище (и в GM, если включено единое)
+         * только из своего keydown по td. Чужой GM_setValue нам недоступен.
+         */
+        function pushCellToUwu(i, mark) {
+          if (pulling || syncMode() === 'off') return;
+          var list = uwuCellList();
+          if (!list || !list[i]) return;
+          var want = normalizeMark(mark);
+          var td = list[i];
+          if (normalizeMark(td.dataset.value || '') === want) return;
+          pushedAt[i] = Date.now();
+          var prev = document.activeElement;
+          try {
+            if (!want) {
+              td.dataset.value = '';
+              td.textContent = '';
+              td.style.backgroundColor = '';
+              pokeUwuSave(list, i);
+            } else {
+              var key = uwuKey(want);
+              try { td.focus({ preventScroll: true }); } catch (e) { td.focus(); }
+              td.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true, cancelable: true }));
+            }
+          } finally {
+            if (prev && prev !== document.activeElement && prev.focus) {
+              try { prev.focus({ preventScroll: true }); } catch (e2) { /* noop */ }
+            }
+          }
+        }
+
+        function pokeUwuSave(list, skip) {
+          var j;
+          for (j = 0; j < list.length; j++) {
+            if (j === skip) continue;
+            var key = uwuKey(normalizeMark(list[j].dataset.value || ''));
+            if (!key) continue;
+            try { list[j].focus({ preventScroll: true }); } catch (e) { list[j].focus(); }
+            list[j].dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true, cancelable: true }));
+            return;
+          }
+        }
+
+        function uwuKey(mark) {
+          if (mark === 'mine') return '-';
+          if (mark === 'transit') return '=';
+          if (/^[0-7]$/.test(mark)) return mark;
+          return '';
+        }
+
+        function pullFromUwu() {
+          if (pulling || syncMode() === 'off') return;
+          var table = uwuTable();
+          var list = uwuCellList();
+          if (!table || !list) { seenUwuTable = null; return; }
+          var rebuilt = table !== seenUwuTable;
+          seenUwuTable = table;
+          if (rebuilt && syncMode() === 'both') return;
+          var changed = [];
+          var now = Date.now();
+          var i;
+          for (i = 0; i < ROWS * COLS; i++) {
+            if (pushedAt[i] && now - pushedAt[i] < 500) continue;
+            var mark = normalizeMark(list[i].dataset.value || '');
+            var cur = syncMode() === 'uwu' ? (shadow[i] || '') : (currentGrid()[i] || '');
+            if (!mark || mark === cur) continue;
+            changed.push({ i: i, mark: mark });
+          }
+          if (!changed.length) return;
+          pulling = true;
+          try {
+            changed.forEach(function (item) {
+              if (syncMode() === 'uwu') shadow[item.i] = item.mark;
+              else currentGrid()[item.i] = item.mark;
+            });
+            if (syncMode() === 'both') { save(); paintAll(); }
+            else paintField();
+          } finally {
+            pulling = false;
+          }
+        }
+
+        function ensureUwuTrain() {
+          var host = document.getElementById('uwu-functionButtonsContainer');
+          var btn = document.getElementById('cwb-lu-train-uwu');
+          if (syncMode() !== 'uwu' || !host) {
+            if (btn && btn.parentNode) btn.parentNode.removeChild(btn);
+            return;
+          }
+          if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'cwb-lu-train-uwu';
+            btn.type = 'button';
+            btn.textContent = 'Кач ЛУ';
+            btn.addEventListener('click', function () {
+              ctx.settings.set('blockDangerous', !ctx.settings.get('blockDangerous'));
+              paintTrain();
+            });
+            host.appendChild(btn);
+          }
+          paintUwuTrain(btn);
+        }
+
+        function paintUwuTrain(btn) {
+          if (!btn) btn = document.getElementById('cwb-lu-train-uwu');
+          if (!btn) return;
+          var on = !!ctx.settings.get('blockDangerous');
+          btn.classList.toggle('active', on);
+          btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          btn.title = on
+            ? 'Кач ЛУ включён: клик и клавиатура по опасным клеткам заблокированы'
+            : 'Кач ЛУ выключен: обычное передвижение';
+        }
+
+        function applyUwuChrome() {
+          panel.style.display = syncMode() === 'uwu' ? 'none' : '';
+          ensureUwuTrain();
+        }
+
         function myPos() {
           var id = ctx.vue.get('cat.id');
           var cats = ctx.vue.get('field.cats');
@@ -3623,7 +3955,7 @@
         function cellIsDangerous(td, c) {
           if (!c) c = cellCoords(td);
           if (!c || c.x < 1 || c.x > COLS || c.y < 1 || c.y > ROWS) return false;
-          if (currentGrid()[idx(c.x, c.y)] === 'mine') return true;
+          if (markAt(idx(c.x, c.y)) === 'mine') return true;
           var map = ctx.vue.get('field.map');
           var cage = map && map[c.y] && map[c.y][c.x];
           return cellLooksUnsafe(td, cage);
@@ -3636,6 +3968,7 @@
           trainBtn.title = on
             ? 'Кач ЛУ включён: клик и клавиатура по опасным клеткам заблокированы'
             : 'Кач ЛУ выключен: обычное передвижение';
+          paintUwuTrain();
         }
 
         function paintField() {
@@ -3644,7 +3977,7 @@
           var hidden = fieldHidden();
           // UwU при «Переносе» красит #cages из СВОЕЙ карты и только мины/переходы.
           // Нашу карту всё равно выводим — иначе поле остаётся пустым.
-          var overlayOn = ctx.settings.get('overlay') && !hidden;
+          var overlayOn = ctx.settings.get('overlay') && !hidden && syncMode() !== 'uwu';
           var blockOn = ctx.settings.get('blockDangerous') && !hidden;
           if (!overlayOn && !blockOn) {
             tds.forEach(clearFieldMarks);
@@ -3731,16 +4064,26 @@
         }
 
         function setMark(i, value) {
-          if (i < 0 || i >= currentGrid().length) return;
-          currentGrid()[i] = normalizeMark(value);
+          if (i < 0 || i >= ROWS * COLS) return;
+          var next = normalizeMark(value);
+          if (syncMode() === 'uwu') {
+            if ((shadow[i] || '') === next && markAt(i) === next) return;
+            shadow[i] = next;
+            pushCellToUwu(i, next);
+            paintField();
+            return;
+          }
+          if (i >= currentGrid().length) return;
+          currentGrid()[i] = next;
           save();
           paintAll();
+          if (syncMode() === 'both') pushCellToUwu(i, next);
         }
 
         function applyToCell(x, y, value, overwrite) {
           if (x < 1 || x > COLS || y < 1 || y > ROWS) return;
           var i = idx(x, y);
-          if (!overwrite && currentGrid()[i]) return;
+          if (!overwrite && markAt(i)) return;
           setMark(i, value);
         }
 
@@ -3788,41 +4131,35 @@
           if (!ctx.settings.get('autoFromServer')) return;
           var map = ctx.vue.get('field.map');
           if (!map) return;
-          var changed = false;
           for (var y = 1; y <= ROWS; y++) {
             for (var x = 1; x <= COLS; x++) {
               var cage = map[y] && map[y][x];
               var mark = cage ? markFromTree(cage.tree) : '';
               if (!mark) continue;
               var i = idx(x, y);
-              var g = currentGrid();
+              var cur = markAt(i);
               if (mark === 'mine') {
-                if (g[i] !== 'mine') { g[i] = 'mine'; changed = true; }
-              } else if (!g[i]) {
-                g[i] = mark;
-                changed = true;
+                if (cur !== 'mine') setMark(i, 'mine');
+              } else if (!cur) {
+                setMark(i, mark);
               }
             }
           }
-          if (changed) { save(); paintAll(); }
         }
 
         function scanUnsafeDom() {
           if (fieldHidden()) return;
           var map = ctx.vue.get('field.map');
           var tds = ctx.dom.qsa('#cages td.cage');
-          var changed = false;
           tds.forEach(function (td) {
             var c = cellCoords(td);
             if (!c || c.x < 1 || c.x > COLS || c.y < 1 || c.y > ROWS) return;
             var cage = map && map[c.y] && map[c.y][c.x];
             if (!cellLooksUnsafe(td, cage)) return;
             var i = idx(c.x, c.y);
-            if (currentGrid()[i] === 'mine') return;
-            currentGrid()[i] = 'mine';
-            changed = true;
+            if (markAt(i) === 'mine') return;
+            setMark(i, 'mine');
           });
-          if (changed) { save(); paintAll(); }
         }
 
         function syncFromField() {
@@ -4001,6 +4338,7 @@
 
         paintNav();
         paintTrain();
+        applyUwuChrome();
         save();
         ctx.addCleanup(ctx.storage.watch(STORAGE_KEY, function (next) {
           if (ctx.isDisposed() || !next || typeof next !== 'object') return;
@@ -4075,7 +4413,14 @@
             syncFromField();
             syncCatHere();
             paintTrain();
+            pullFromUwu();
+            ensureUwuTrain();
           }, 50);
+
+          ctx.addCleanup(function () {
+            var btn = document.getElementById('cwb-lu-train-uwu');
+            if (btn && btn.parentNode) btn.parentNode.removeChild(btn);
+          });
 
           if (ctx.vue.onChatMessage) {
             ctx.addCleanup(ctx.vue.onChatMessage(function (fresh) {

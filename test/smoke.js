@@ -695,6 +695,34 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check('импорт карт UwU пишет в cwb:climbing-maps',
       !!(imported && imported.indexOf('UwU вкладка') >= 0 && imported.indexOf('"7"') >= 0));
     check('импорт не пишет в стор UwU', !!window.localStorage.getItem('uwu_climbingPanelState'));
+    var pasteBox = $('#cwb-root .cwb-maps-editor textarea');
+    var pasteBtn = [...window.document.querySelectorAll('#cwb-root .cwb-maps-editor button')]
+      .find((b) => /Забрать карты из экспорта/.test(b.textContent));
+    var mineGrid = uwuGrid.map((row, y) => row.map((cell, x) => (
+      y === 1 && x === 2 ? { value: 'mine' } : cell
+    )));
+    if (pasteBox && pasteBtn) {
+      pasteBox.value = JSON.stringify({
+        uwu_climbingPanelStatus: { currentTabIndex: 0, currentTableId: 0 },
+        uwu_climbingPanelState: {
+          currentTabIndex: 0,
+          currentTableId: 0,
+          tabs: [{
+            name: 'Экспорт вкладка',
+            tables: [{ name: 'Локация X', data: mineGrid }],
+          }],
+        },
+      });
+      pasteBtn.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+      await sleep(80);
+      var fromExport = window.localStorage.getItem('cwb:climbing-maps');
+      check('экспорт UwU переносит имя локации', !!(fromExport && fromExport.indexOf('Локация X') >= 0));
+      check('экспорт UwU переносит клетку-мину', !!(fromExport && fromExport.indexOf('"mine"') >= 0));
+      check('вставка экспорта не затирает стор UwU',
+        window.localStorage.getItem('uwu_climbingPanelState').indexOf('UwU вкладка') >= 0);
+    } else {
+      check('поле вставки экспорта UwU найдено', false);
+    }
   } else {
     check('кнопка импорта карт UwU найдена', false);
   }
@@ -710,6 +738,64 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(350);
   check('оверлей ЛУ жив при переносе UwU',
     !!window.document.querySelector('#cages td.cage[data-cwb-lu-fill]'));
+
+  var uwuHost = window.document.createElement('div');
+  uwuHost.id = 'uwu-functionButtonsContainer';
+  var uwuTable = window.document.createElement('table');
+  uwuTable.id = 'uwu-climbingPanel';
+  for (var uy2 = 0; uy2 < 6; uy2++) {
+    var tr = window.document.createElement('tr');
+    for (var ux2 = 0; ux2 < 10; ux2++) {
+      var cell = window.document.createElement('td');
+      cell.tabIndex = 0;
+      tr.appendChild(cell);
+    }
+    uwuTable.appendChild(tr);
+  }
+  window.document.body.appendChild(uwuHost);
+  window.document.body.appendChild(uwuTable);
+  window.document.addEventListener('keydown', function (e) {
+    var el = window.document.activeElement;
+    if (!el || el.tagName !== 'TD' || !el.closest('#uwu-climbingPanel')) return;
+    if (e.key >= '0' && e.key <= '7') el.dataset.value = e.key;
+    else if (e.key === '-') el.dataset.value = 'mine';
+    else if (e.key === '=') el.dataset.value = 'transit';
+  });
+  function pickUwuSync(value) {
+    var sel = [...window.document.querySelectorAll('#cwb-root [data-cwb-mod="climbing-field"] select')]
+      .find((node) => [...node.options].some((o) => o.value === 'uwu'));
+    if (!sel) return false;
+    sel.value = value;
+    sel.dispatchEvent(new window.Event('change', { bubbles: true }));
+    return true;
+  }
+  check('режим живой карты UwU есть в настройках', pickUwuSync('both'));
+  await sleep(250);
+  var ourCell = window.document.querySelector('#cwb-lu-grid td');
+  if (ourCell) {
+    ourCell.dispatchEvent(new window.KeyboardEvent('keydown', { key: '5', bubbles: true }));
+    await sleep(30);
+  }
+  check('пометка уходит в открытую клетку UwU',
+    uwuTable.querySelector('td').dataset.value === '5',
+    uwuTable.querySelector('td').dataset.value);
+  check('наша панель при режиме «и к нам, и в UwU» на месте',
+    window.document.getElementById('cwb-lu').style.display !== 'none');
+  pickUwuSync('uwu');
+  await sleep(250);
+  check('режим «только UwU» прячет нашу панель',
+    window.document.getElementById('cwb-lu').style.display === 'none');
+  var uwuTrain = window.document.getElementById('cwb-lu-train-uwu');
+  check('на панели UwU есть кнопка Кач ЛУ', !!(uwuTrain && uwuTrain.classList.contains('active')));
+  if (uwuTrain) {
+    uwuTrain.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    await sleep(40);
+    check('кнопка Кач ЛУ на панели UwU выключает блок',
+      !window.document.getElementById('cwb-lu-train-uwu').classList.contains('active'));
+  } else {
+    check('кнопка Кач ЛУ на панели UwU выключает блок', false);
+  }
+
   toggleModule('climbing-field');
   ['hide-cat-tooltip', 'always-day', 'grid'].forEach(toggleModule);
 

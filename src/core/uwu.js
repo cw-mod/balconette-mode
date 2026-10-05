@@ -240,52 +240,167 @@ function hintFor(id) {
   return parts.filter(Boolean).join(' ');
 }
 
+/** JSON.parse до трёх раз: UwU иногда кладёт уже строку, а экспорт — строку строки. */
+function parseMaybe(value) {
+  var v = value;
+  var n;
+  for (n = 0; n < 3 && typeof v === 'string'; n++) {
+    var s = v.trim();
+    if (!s) return null;
+    try { v = JSON.parse(s); } catch (e) { return null; }
+  }
+  return v;
+}
+
+/** Массив, строка с JSON-массивом или объект с ключами "0","1",… */
+function asList(value) {
+  var v = typeof value === 'string' ? parseMaybe(value) : value;
+  if (Array.isArray(v)) return v;
+  if (!v || typeof v !== 'object') return [];
+  var keys = Object.keys(v).filter(function (k) { return /^\d+$/.test(k); });
+  if (!keys.length) return [];
+  keys.sort(function (a, b) { return Number(a) - Number(b); });
+  var list = [];
+  for (var i = 0; i < keys.length; i++) list.push(v[keys[i]]);
+  return list;
+}
+
+function cellText(cell) {
+  var v = cell;
+  if (v && typeof v === 'object') {
+    if (v.value != null) v = v.value;
+    else if (v.val != null) v = v.val;
+    else return '';
+  }
+  if (typeof v === 'number' && isFinite(v)) v = String(v);
+  return typeof v === 'string' ? v : '';
+}
+
+function isCellRow(item) {
+  if (Array.isArray(item)) return true;
+  var nested = asList(item);
+  return nested.length > 1;
+}
+
+/**
+ * Сетка UwU: 6 рядов по 10 клеток `{ value }`, либо плоский список из 60.
+ * «mine» / «transit» оставляем как есть — панель сама рисует X и =.
+ */
 function flattenUwuTable(data) {
+  var src = typeof data === 'string' ? parseMaybe(data) : data;
   var flat = [];
   var y;
   var x;
-  if (!Array.isArray(data)) return flat;
+  if (Array.isArray(src) && src.length === 60 && !isCellRow(src[0])) {
+    for (x = 0; x < 60; x++) flat.push(cellText(src[x]));
+    return flat;
+  }
+  var rows = asList(src);
+  if (!rows.length) return flat;
   for (y = 0; y < 6; y++) {
-    var row = data[y];
-    for (x = 0; x < 10; x++) {
-      var cell = row && row[x];
-      var v = cell && typeof cell === 'object' ? cell.value : cell;
-      flat.push(typeof v === 'string' ? v : '');
-    }
+    var cells = asList(rows[y]);
+    for (x = 0; x < 10; x++) flat.push(cellText(cells[x]));
   }
   return flat;
 }
 
+function tableName(t, j) {
+  if (!t || typeof t !== 'object' || Array.isArray(t)) return 'Поле ' + (j + 1);
+  var name = t.name || t.title || t.location || t.label;
+  name = name == null ? '' : String(name).trim();
+  return name || ('Поле ' + (j + 1));
+}
+
+function clampIndex(n, len) {
+  if (typeof n !== 'number' || n < 0 || n >= len) return 0;
+  return n;
+}
+
 /**
- * Карты минника UwU → наш формат cwb:climbing-maps.
- * Ничего не пишет: вызывающий сам кладёт в наш стор.
+ * Состояние панели или весь экспорт настроек UwU
+ * (`{ uwu_climbingPanelState, uwu_climbingPanelStatus, ... }`).
  */
-function importClimbingMaps() {
-  var raw = readJson('uwu_climbingPanelState');
-  if (!raw || !Array.isArray(raw.tabs) || !raw.tabs.length) return null;
-  var tabs = raw.tabs.map(function (tab, i) {
+function mapsFromUnknown(value, statusFallback) {
+  var val = parseMaybe(value);
+  if (!val || typeof val !== 'object') return null;
+  var state = val;
+  var status = statusFallback || null;
+  if (val.uwu_climbingPanelState != null) {
+    state = parseMaybe(val.uwu_climbingPanelState);
+    if (!status && val.uwu_climbingPanelStatus != null) status = parseMaybe(val.uwu_climbingPanelStatus);
+  }
+  if (!state || typeof state !== 'object') return null;
+  var tabList = asList(state.tabs);
+  if (!tabList.length) return null;
+
+  var currentTab = typeof state.currentTabIndex === 'number' ? state.currentTabIndex
+    : typeof state.currentTab === 'number' ? state.currentTab : 0;
+  var liveTable = typeof state.currentTableId === 'number' ? state.currentTableId : null;
+  if (status && typeof status === 'object') {
+    if (typeof status.currentTabIndex === 'number') currentTab = status.currentTabIndex;
+    if (typeof status.currentTableId === 'number') liveTable = status.currentTableId;
+  }
+
+  var tabs = tabList.map(function (tab, i) {
     var tables = [];
-    var list = Array.isArray(tab.tables) ? tab.tables : [];
-    list.forEach(function (t, j) {
+    asList(tab && tab.tables).forEach(function (t, j) {
+      var gridSrc = t && (t.data != null ? t.data : t.grid != null ? t.grid : t.cells);
       tables.push({
-        name: String((t && t.name) || ('Поле ' + (j + 1))),
-        grid: flattenUwuTable(t && t.data),
+        name: tableName(t, j),
+        grid: flattenUwuTable(gridSrc),
       });
     });
     if (!tables.length) tables.push({ name: 'Поле 1', grid: flattenUwuTable(null) });
     var currentTable = typeof tab.currentTableId === 'number' ? tab.currentTableId
       : typeof tab.currentTable === 'number' ? tab.currentTable : 0;
-    if (currentTable < 0 || currentTable >= tables.length) currentTable = 0;
+    if (i === currentTab && liveTable != null) currentTable = liveTable;
+    currentTable = clampIndex(currentTable, tables.length);
     return {
-      name: String((tab && tab.name) || ('Вкладка ' + (i + 1))),
+      name: String((tab && tab.name) || ('Вкладка ' + (i + 1))).trim() || ('Вкладка ' + (i + 1)),
       currentTable: currentTable,
       tables: tables,
     };
   });
-  var currentTab = typeof raw.currentTabIndex === 'number' ? raw.currentTabIndex
-    : typeof raw.currentTab === 'number' ? raw.currentTab : 0;
-  if (currentTab < 0 || currentTab >= tabs.length) currentTab = 0;
+  currentTab = clampIndex(currentTab, tabs.length);
   return { version: 2, currentTab: currentTab, tabs: tabs };
+}
+
+function climbingMapsHaveMarks(maps) {
+  if (!maps || !Array.isArray(maps.tabs)) return false;
+  for (var i = 0; i < maps.tabs.length; i++) {
+    var tables = maps.tabs[i].tables || [];
+    for (var j = 0; j < tables.length; j++) {
+      var grid = tables[j].grid || [];
+      for (var k = 0; k < grid.length; k++) {
+        if (grid[k]) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Карты минника UwU → наш формат cwb:climbing-maps.
+ * Сначала localStorage. Если на странице открыты настройки UwU и в поле
+ * «Экспорт» клеток больше (единое хранилище не пишет свежие карты в localStorage),
+ * берём экспорт. Ничего не пишет: вызывающий сам кладёт в наш стор.
+ */
+function importClimbingMaps() {
+  var fromStore = mapsFromUnknown(readJson('uwu_climbingPanelState'), readJson('uwu_climbingPanelStatus'));
+  var fromDom = null;
+  try {
+    var field = document.getElementById('exportSettings');
+    if (field && field.value) fromDom = mapsFromUnknown(field.value);
+  } catch (e) { /* нет DOM */ }
+  if (!fromStore) return fromDom;
+  if (fromDom && !climbingMapsHaveMarks(fromStore) && climbingMapsHaveMarks(fromDom)) return fromDom;
+  return fromStore;
+}
+
+/** Вставка из поля «Экспорт» UwU или голый объект панели. */
+function climbingMapsFromExport(text) {
+  if (text == null || !String(text).trim()) return null;
+  return mapsFromUnknown(String(text));
 }
 
 module.exports = {
@@ -310,4 +425,6 @@ module.exports = {
   tabOf: tabOf,
   hintFor: hintFor,
   importClimbingMaps: importClimbingMaps,
+  climbingMapsFromExport: climbingMapsFromExport,
+  climbingMapsHaveMarks: climbingMapsHaveMarks,
 };
