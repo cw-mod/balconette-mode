@@ -9,8 +9,6 @@
 var audio = require('core/audio');
 var dom = require('core/dom');
 
-var IS_LU = require('cwb:meta').variant === 'lu';
-
 var PERM_BTN = 'cwb-notify-perm';
 
 module.exports = {
@@ -30,91 +28,53 @@ module.exports = {
     volume: 0.4,
   },
 
-  schema: IS_LU
-    ? [
-        { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
-        { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
-        { key: 'volume', type: 'range', label: 'Громкость звука', min: 0, max: 1, step: 0.05 },
-        {
-          key: '_testSound',
-          type: 'custom',
-          label: 'Проверить звук',
-          render: function () {
-            return dom.el('button', {
-              type: 'button',
-              class: 'cwb-btn',
-              text: 'Проверить звук',
-              onclick: function () {
-                var registry = require('core/registry');
-                audio.play('pm', registry.settingsOf('notifications').volume);
-              },
-            });
+  schema: [
+    { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
+    { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
+    { key: 'volume', type: 'range', label: 'Громкость звука', min: 0, max: 1, step: 0.05 },
+    {
+      key: '_testSound',
+      type: 'custom',
+      label: 'Проверить звук',
+      render: function () {
+        return dom.el('button', {
+          type: 'button',
+          class: 'cwb-btn',
+          text: 'Проверить звук',
+          onclick: function () {
+            var registry = require('core/registry');
+            audio.play('pm', registry.settingsOf('notifications').volume);
           },
-        },
-        {
-          key: '_perm',
-          type: 'boolean',
-          label: 'Запросить разрешение браузера',
-          hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
-        },
-      ]
-    : [
-        { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
-        { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
-        { key: 'sound', type: 'boolean', label: 'Звук при уведомлении' },
-        { key: 'blinkTitle', type: 'boolean', label: 'Мигать заголовком вкладки' },
-        { key: 'volume', type: 'range', label: 'Громкость звука', min: 0.05, max: 1, step: 0.05 },
-        {
-          key: '_perm',
-          type: 'boolean',
-          label: 'Запросить разрешение браузера',
-          hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
-        },
-      ],
+        });
+      },
+    },
+    {
+      key: '_perm',
+      type: 'custom',
+      label: 'Запросить разрешение',
+      render: function () {
+        return dom.el('button', {
+          type: 'button',
+          class: 'cwb-btn',
+          text: 'Запросить разрешение',
+          onclick: function () {
+            if (typeof Notification !== 'undefined') {
+              Notification.requestPermission();
+            }
+          },
+        });
+      },
+    },
+  ],
 
   init: function (ctx) {
-    var origTitle = document.title;
-    var blinkTimer = null;
-    var blinkOn = false;
-
-    function stopBlink() {
-      clearInterval(blinkTimer);
-      blinkTimer = null;
-      document.title = origTitle;
-      blinkOn = false;
-    }
-
-    function blink(title) {
-      if (!ctx.settings.get('blinkTitle')) return;
-      stopBlink();
-      var alt = '● ' + title;
-      blinkTimer = ctx.interval(function () {
-        document.title = blinkOn ? origTitle : alt;
-        blinkOn = !blinkOn;
-      }, 900);
-      ctx.on(window, 'focus', stopBlink);
-    }
-
     function notify(title, body, kind) {
-      if (IS_LU) {
-        audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
-      } else {
-        if (ctx.settings.get('sound')) audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
-        blink(title);
-      }
+      audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
       if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
       try {
         var n = new Notification(title, { body: body, tag: 'cwb-' + kind });
         n.onclick = function () { window.focus(); n.close(); };
       } catch (e) { ctx.log.warn('Notification API', e); }
-    }
-
-    // Кнопка разрешения — через одноразовый обработчик настройки _perm
-    if (ctx.settings.get('_perm') && typeof Notification !== 'undefined' &&
-        Notification.permission === 'default') {
-      Notification.requestPermission().finally(function () {
-        ctx.settings.set('_perm', false);
-      });
     }
 
     return ctx.whenVueReady().then(function (vm) {
@@ -145,18 +105,9 @@ module.exports = {
   },
 
   destroy: function () {
-    if (typeof document !== 'undefined') document.title = document.title.replace(/^●\s*/, '');
   },
 
   onSettings: function (ctx, key) {
-    if (key === '_perm') {
-      if (ctx.settings.get('_perm') && typeof Notification !== 'undefined') {
-        Notification.requestPermission().finally(function () {
-          ctx.settings.set('_perm', false);
-        });
-      }
-      return;
-    }
     var registry = require('core/registry');
     registry.stopModule('notifications');
     registry.startModule('notifications');

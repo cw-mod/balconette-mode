@@ -15,17 +15,10 @@ var log = require('core/log').create('ui');
 var registry = require('core/registry');
 var storage = require('core/storage');
 var config = require('core/config');
-var uwu = require('core/uwu');
 var meta = require('cwb:meta');
-var IS_LU = meta.variant === 'lu';
 
 var ROOT_ID = 'cwb-root';
 var STYLE_ID = 'core-ui';
-
-var TABS = [
-  { id: 'new', title: 'Новые', hint: 'То, чего в UwU нет' },
-  { id: 'overlay', title: 'Надстройки над UwU', hint: 'Наши штуки поверх / вместо аналогов UwU' },
-];
 
 var state = {
   root: null,
@@ -33,10 +26,7 @@ var state = {
   overlay: null,
   listEl: null,
   searchEl: null,
-  tabsEl: null,
-  noteEl: null,
   query: '',
-  tab: meta.variant === 'lu' ? 'overlay' : 'new',
   open: false,
   offRegistry: null,
   offKeys: [],
@@ -52,17 +42,12 @@ function css() {
     'font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#1c1c1e;}',
     '#cwb-root *{box-sizing:border-box;}',
 
-    '.cwb-gear{position:fixed;z-index:2147483647;pointer-events:auto;',
+    '.cwb-gear{position:fixed;right:0;bottom:72px;z-index:2147483647;pointer-events:auto;',
     'min-width:44px;height:36px;padding:0 10px;border-radius:18px 0 0 18px;',
     'border:1px solid #3d3224;cursor:pointer;background:#e8c27a;color:#2a1f12;',
     'font:600 13px/34px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;',
     'box-shadow:0 2px 12px rgba(0,0,0,.45);opacity:1;transition:transform .15s,filter .15s;}',
     '.cwb-gear:hover{filter:brightness(1.08);}',
-    '.cwb-gear[hidden]{display:none;}',
-    '.cwb-gear.cwb-bottom-right,.cwb-gear.cwb-top-right{right:0;border-radius:18px 0 0 18px;}',
-    '.cwb-gear.cwb-bottom-left,.cwb-gear.cwb-top-left{left:0;border-radius:0 18px 18px 0;}',
-    '.cwb-gear.cwb-bottom-right,.cwb-gear.cwb-bottom-left{bottom:72px;}',
-    '.cwb-gear.cwb-top-right,.cwb-gear.cwb-top-left{top:72px;}',
 
     '.cwb-overlay{position:fixed;inset:0;z-index:2147483646;pointer-events:auto;background:rgba(0,0,0,.45);',
     'display:flex;align-items:center;justify-content:center;padding:24px;}',
@@ -81,15 +66,6 @@ function css() {
     '.cwb-x:hover{opacity:1;}',
 
     '.cwb-body{flex:1 1 auto;overflow-y:auto;padding:8px 14px 14px;}',
-
-    '.cwb-tabs{display:flex;gap:6px;padding:8px 14px 0;background:#fdfbf7;flex:0 0 auto;}',
-    '.cwb-tab{flex:1 1 0;min-width:0;padding:7px 10px;border:1px solid #d6cbb8;border-radius:8px;',
-    'background:#fff;cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;color:#3d3224;}',
-    '.cwb-tab:hover{background:#f0e9db;}',
-    '.cwb-tab[aria-selected="true"]{background:#e8c27a;border-color:#e8c27a;color:#2a1f12;}',
-    '.cwb-tab-note{padding:6px 14px 0;font-size:11.5px;color:#8a7f70;flex:0 0 auto;}',
-    '.cwb-uwu-banner{margin:6px 0 10px;padding:8px 10px;border-radius:8px;background:#f4efe4;',
-    'border:1px solid #e6ddcd;font-size:12px;color:#5c5348;}',
 
     '.cwb-cat{margin-top:14px;}',
     '.cwb-cat:first-child{margin-top:4px;}',
@@ -258,17 +234,7 @@ function moduleCard(mod) {
         registry.setSetting(mod.id, item.key, value);
       }));
     });
-    if (!IS_LU) {
-      opts.appendChild(dom.el('div', { class: 'cwb-opt' }, [
-        dom.el('button', {
-          class: 'cwb-btn',
-          type: 'button',
-          text: 'Сбросить настройки',
-          onclick: function () { registry.resetSettings(mod.id); render(); },
-        }),
-      ]));
     }
-  }
 
   var sw = dom.el('label', { class: 'cwb-sw' }, [
     dom.el('input', { type: 'checkbox', checked: enabled ? true : null }),
@@ -283,7 +249,6 @@ function moduleCard(mod) {
       dom.el('div', { class: 'cwb-mod-main' }, [
         dom.el('div', { class: 'cwb-mod-name', text: mod.title }),
         mod.description ? dom.el('div', { class: 'cwb-mod-desc', text: mod.description }) : null,
-        compatHint(mod),
         mod.warning ? dom.el('div', { class: 'cwb-mod-warn', text: '⚠ ' + mod.warning }) : null,
       ]),
       sw,
@@ -306,55 +271,17 @@ function coreCard() {
     dom.el('div', { class: 'cwb-mod-head' }, [
       dom.el('div', { class: 'cwb-mod-main' }, [
         dom.el('div', { class: 'cwb-mod-name', text: 'Ядро' }),
-        dom.el('div', { class: 'cwb-mod-desc', text: 'Кнопка панели, логи, хук сокета.' }),
+        dom.el('div', { class: 'cwb-mod-desc', text: 'Логи скрипта в консоли.' }),
       ]),
     ]),
     opts,
   ]);
 }
 
-function compatHint(mod) {
-  if (uwu.tabOf(mod) !== 'overlay') return null;
-  var text = uwu.hintFor(mod.id);
-  if (!text) return null;
-  return dom.el('div', { class: 'cwb-mod-desc', text: text });
-}
-
 function matchesQuery(mod, query) {
   if (!query) return true;
   var hay = (mod.title + ' ' + mod.description + ' ' + mod.id).toLowerCase();
   return hay.indexOf(query) >= 0;
-}
-
-function matchesTab(mod, tab) {
-  return uwu.tabOf(mod) === tab;
-}
-
-function currentTabMeta() {
-  for (var i = 0; i < TABS.length; i++) {
-    if (TABS[i].id === state.tab) return TABS[i];
-  }
-  return TABS[0];
-}
-
-function paintTabs() {
-  if (!state.tabsEl) return;
-  state.tabsEl.querySelectorAll('.cwb-tab').forEach(function (btn) {
-    var on = btn.getAttribute('data-cwb-tab') === state.tab;
-    btn.setAttribute('aria-selected', on ? 'true' : 'false');
-  });
-  if (state.noteEl) {
-    var metaTab = currentTabMeta();
-    var note = metaTab.hint;
-    if (state.tab === 'overlay') {
-      if (uwu.present()) {
-        note = 'UwU найден (' + uwu.sourceLabel() + '). Смотрим их настройки, своё туда не пишем.';
-      } else {
-        note = metaTab.hint + '. UwU нет — модули работают сами.';
-      }
-    }
-    state.noteEl.textContent = note;
-  }
 }
 
 /** Чтобы input не терял фокус при registry.onChange → render(). */
@@ -400,23 +327,14 @@ function render() {
   var focusHint = captureFocusHint();
   var query = state.query.trim().toLowerCase();
   state.listEl.textContent = '';
-  if (!IS_LU) paintTabs();
 
-  if (!query && (IS_LU || state.tab === 'new')) state.listEl.appendChild(coreCard());
-  if (!query && !IS_LU && state.tab === 'overlay') {
-    state.listEl.appendChild(dom.el('div', {
-      class: 'cwb-uwu-banner',
-      text: uwu.present()
-        ? 'UwU уже рядом. Что у них включено, второй раз не дублируем. Карты ЛУ можно забрать в «Поле для ЛУ».'
-        : 'UwU нет. Надстройки работают сами. Если включишь оба мода, часть вещей не будет дублироваться.',
-    }));
-  }
+  if (!query) state.listEl.appendChild(coreCard());
 
   var shown = 0;
   registry.CATEGORIES.forEach(function (cat) {
     var mods = registry.list().filter(function (m) {
       if (m.category !== cat.id || !matchesQuery(m, query)) return false;
-      return query || IS_LU ? true : matchesTab(m, state.tab);
+      return true;
     });
     if (!mods.length) return;
     shown += mods.length;
@@ -466,12 +384,7 @@ function toggle() {
 }
 
 function applyCoreSettings() {
-  var cfg = config.all();
-  if (state.gear) {
-    state.gear.className = 'cwb-gear cwb-' + cfg.gearCorner;
-    state.gear.hidden = !!cfg.gearHidden;
-  }
-  require('core/log').setLevel(cfg.logLevel);
+  require('core/log').setLevel(config.all().logLevel);
 }
 
 /** Гасим клавиатуру внутри панели, чтобы не срабатывали хоткеи игры. */
@@ -501,29 +414,6 @@ function mount() {
   var search = dom.el('input', { class: 'cwb-search', type: 'search', placeholder: 'Поиск по модулям…' });
   search.addEventListener('input', function (e) { state.query = e.target.value; render(); });
 
-  var tabs = null;
-  var tabNote = null;
-  if (!IS_LU) {
-    tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
-    TABS.forEach(function (tab) {
-      var btn = dom.el('button', {
-        class: 'cwb-tab',
-        type: 'button',
-        role: 'tab',
-        'data-cwb-tab': tab.id,
-        'aria-selected': tab.id === state.tab ? 'true' : 'false',
-        text: tab.title,
-      });
-      btn.addEventListener('click', function () {
-        if (state.tab === tab.id) return;
-        state.tab = tab.id;
-        render();
-      });
-      tabs.appendChild(btn);
-    });
-    tabNote = dom.el('div', { class: 'cwb-tab-note' });
-  }
-
   var list = dom.el('div', { class: 'cwb-body' });
 
   var modalChildren = [
@@ -533,12 +423,8 @@ function mount() {
       search,
       dom.el('button', { class: 'cwb-x', type: 'button', title: 'Закрыть', text: '×', onclick: close }),
     ]),
+    list,
   ];
-  if (tabs) {
-    modalChildren.push(tabs);
-    modalChildren.push(tabNote);
-  }
-  modalChildren.push(list);
   modalChildren.push(dom.el('div', { class: 'cwb-foot' }, [
     dom.el('button', {
       class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
@@ -577,15 +463,12 @@ function mount() {
   state.overlay = overlay;
   state.listEl = list;
   state.searchEl = search;
-  state.tabsEl = tabs;
-  state.noteEl = tabNote;
 
   isolateKeyboard(root);
 
   // Esc закрывает панель; хоткей открытия — Ctrl+Alt+B.
   state.offKeys.push(dom.on(document, 'keydown', function (e) {
     if (state.open && e.key === 'Escape') { close(); e.stopPropagation(); return; }
-    if (!config.get('hotkey')) return;
     if (e.ctrlKey && e.altKey && (e.key === 'b' || e.key === 'B' || e.code === 'KeyB')) {
       e.preventDefault();
       e.stopPropagation();
@@ -640,7 +523,6 @@ function unmount() {
   if (state.root && state.root.parentNode) state.root.remove();
   dom.removeStyle(STYLE_ID);
   state.root = state.gear = state.overlay = state.listEl = state.searchEl = null;
-  state.tabsEl = state.noteEl = null;
   state.open = false;
 }
 
@@ -653,5 +535,4 @@ module.exports = {
   toggle: toggle,
   render: render,
   toast: toast,
-  TABS: TABS,
 };

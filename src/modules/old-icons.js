@@ -15,9 +15,6 @@
  *   custom  — свой JSON {"1": "https://…", "exchange": "https://…"}.
  */
 
-var IS_LU = false;
-try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
-
 var data = require('data/old-icons');
 var dom = require('core/dom');
 
@@ -54,7 +51,7 @@ module.exports = {
   pages: ['game'],
   enabledByDefault: false,
   order: 20,
-  warning: IS_LU ? 'Иконки грузятся со стороннего хоста d.zaix.ru.' : 'Встроенный список неполный (' + data.count + ' иконок) и тянет картинки с d.zaix.ru. Лучше свой URL или свой словарь.',
+  warning: 'Иконки грузятся со стороннего хоста d.zaix.ru.',
 
   defaults: {
     source: 'builtin',     // builtin | base | custom
@@ -63,26 +60,7 @@ module.exports = {
     includeExtra: true,
   },
 
-  schema: IS_LU ? [] : [
-    {
-      key: 'source',
-      type: 'select',
-      label: 'Откуда брать картинки',
-      options: [
-        { value: 'builtin', label: 'Встроенный словарь (из CW Shed)' },
-        { value: 'base', label: 'Свой базовый URL: {base}/{id}.png' },
-        { value: 'custom', label: 'Свой словарь JSON' },
-      ],
-    },
-    { key: 'baseUrl', type: 'text', label: 'Базовый URL', placeholder: 'https://example.com/cw-old-icons' },
-    {
-      key: 'customMap',
-      type: 'textarea',
-      label: 'Свой словарь',
-      placeholder: '{\n  "1": "https://…/1.png",\n  "exchange": "https://…/exchange.png"\n}',
-    },
-    { key: 'includeExtra', type: 'boolean', label: 'Менять ещё и иконку диалога' },
-  ],
+  schema: [],
 
   styles: function (s) {
     var map = buildMap(s);

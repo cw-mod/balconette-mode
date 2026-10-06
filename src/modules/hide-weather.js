@@ -1,6 +1,3 @@
-var IS_LU = false;
-try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
-
 /**
  * Скрыть погоду.
  *
@@ -25,7 +22,7 @@ module.exports = {
   pages: ['game'],
   enabledByDefault: false,
   order: 40,
-  warning: IS_LU ? null : '«Вся строка погоды» прячет ещё и «Моё местонахождение» — оно в той же строке.',
+  warning: null,
 
   defaults: {
     sky: true,
@@ -35,21 +32,10 @@ module.exports = {
     wholeRow: false,
   },
 
-  schema: IS_LU ? [
+  schema: [
     { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
     { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
     { key: 'season', type: 'boolean', label: 'Иконка сезона' },
-  ] : [
-    { key: 'sky', type: 'boolean', label: 'Небо над полем' },
-    { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
-    { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
-    { key: 'season', type: 'boolean', label: 'Иконка сезона' },
-    {
-      key: 'wholeRow',
-      type: 'boolean',
-      label: 'Вся строка погоды',
-      hint: 'Перебивает галочки выше. В компакте ещё спрячет название локации.',
-    },
   ],
 
   styles: function (s) {

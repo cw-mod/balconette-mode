@@ -2,9 +2,9 @@
 // @name         CatWar Balconette
 // @name:ru      CatWar Balconette
 // @namespace    catwar-balconette
-// @version      0.1.8
-// @description  Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
-// @description:ru Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
+// @version      0.2.0
+// @description  Поле для ЛУ, координаты клеток, кот ↔ действия, старые иконки, автопрокрутка истории, ID в личных сообщениях, уведомления, редиректы доменов, статичный фон, погода.
+// @description:ru Поле для ЛУ, координаты клеток, кот ↔ действия, старые иконки, автопрокрутка истории, ID в личных сообщениях, уведомления, редиректы доменов, статичный фон, погода.
 // @author       balconette
 // @license      MIT
 // @homepageURL  https://cw-mod.github.io/balconette-mode/

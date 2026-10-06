@@ -6,7 +6,7 @@
  * и импорт одинаковы для обоих бэкендов.
  *
  * Схема ключей (см. SPEC.md, раздел «Соглашения»):
- *   cwb:core          — настройки ядра  { logLevel, gearCorner, socketHook, ... }
+ *   cwb:core          — настройки ядра  { logLevel }
  *   cwb:mod.<id>      — состояние модуля { enabled: bool, opt: { ... } }
  */
 

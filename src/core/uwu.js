@@ -10,19 +10,14 @@ var log = require('core/log').create('uwu');
 var STORE_KEYS = [
   'uwu_settings',
   'uwu_fastStyles',
-  'uwu_fastStyles_hideCatTooltip',
   'uwu_climbingPanelState',
   'uwu_climbingPanelStatus',
-  'uwu_clock',
-  'uwu_layoutSettings',
 ];
 
 var DOM_IDS = [
   'uwusettings',
   'uwu-climbingMainPanel',
   'uwu-climbingPanel',
-  'uwu-clock',
-  'uwu-fast-style-hideCatTooltip',
   'uwu-fast-style-hideSky',
   'cellsBordersStyle',
 ];
@@ -32,38 +27,11 @@ var DOM_IDS = [
  * hint показывается в карточке надстройки.
  */
 var OVERLAY = {
-  'always-day': {
-    hint: 'В UwU — «Всегда день/ярко». Дневное небо — наше. Если у них уже включено, наше поле не трогаем.',
-  },
-  'grid': {
-    hint: 'В UwU — «Границы клеток». Если они включены, нашу сетку не рисуем.',
-  },
   'static-background': {
     hint: 'В UwU — «Статичный фон локации». Если он включён, фон поля не трогаем, фон страницы остаётся нашим.',
   },
   'hide-weather': {
     hint: 'В UwU быстрый стиль «Скрыть небо». Если небо уже спрятано, наше не дублируем.',
-  },
-  'hide-cat-tooltip': {
-    hint: 'В UwU есть быстрый стиль «скрыть окно О коте». Если уже скрыто, наше не вешаем.',
-  },
-  'clock': {
-    hint: 'В UwU — свои часы. Два виджета сразу налезают друг на друга: выключи одни.',
-  },
-  'action-title': {
-    hint: 'В UwU — «Дублировать время в заголовке вкладки». Если оно включено, заголовок не трогаем.',
-  },
-  'skill-fractions': {
-    hint: 'В UwU — «Точные значения навыков». Если включено, наши дроби не рисуем.',
-  },
-  'param-info': {
-    hint: 'В UwU — «Подробные параметры» (кнопка над блоком). Наша карточка по клику на навык — рядом, не вместо.',
-  },
-  'sounds': {
-    hint: 'В UwU свой набор звуков (ЛС, конец действия, рот, блок). В их настройки не лезем. Если оба мода включены, звуки могут наложиться — выключи дубли там или здесь.',
-  },
-  'hunt-smell-square': {
-    hint: 'В UwU — «Описывать запах на охоте». Если включено, нашу подсказку не вешаем.',
   },
   'climbing-field': {
     hint: 'В UwU — «Минное поле». Кач ЛУ, цифра из [треск] и автоярусы — наши. Поле красим из нашей карты, даже если у них включён перенос. Карты можно забрать из их localStorage.',
@@ -109,10 +77,7 @@ function setting(key) {
 }
 
 function fastStyle(key) {
-  if (fastStyles()[key]) return true;
-  // старый одиночный ключ
-  if (key === 'hideCatTooltip' && readLocal('uwu_fastStyles_hideCatTooltip')) return true;
-  return false;
+  return !!fastStyles()[key];
 }
 
 function hasDom() {

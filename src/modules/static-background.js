@@ -10,9 +10,6 @@
  * опция: помечаем такие stylesheet-ы disabled и возвращаем обратно в destroy.
  */
 
-var IS_LU = false;
-try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
-
 var dom = require('core/dom');
 
 function backgroundValue(s) {
@@ -39,7 +36,7 @@ module.exports = {
     disableSeasonalCss: false,
   },
 
-  schema: IS_LU ? [
+  schema: [
     {
       key: 'mode',
       type: 'select',
@@ -51,45 +48,14 @@ module.exports = {
     },
     { key: 'color', type: 'color', label: 'Цвет' },
     { key: 'imageUrl', type: 'text', label: 'Ссылка на картинку', placeholder: 'https://…/bg.png' },
-  ] : [
-    {
-      key: 'target',
-      type: 'select',
-      label: 'Что менять',
-      options: [
-        { value: 'field', label: 'Только фон локации' },
-        { value: 'page', label: 'Только фон страницы' },
-        { value: 'both', label: 'И то, и другое' },
-      ],
-    },
-    {
-      key: 'mode',
-      type: 'select',
-      label: 'Чем заменить',
-      options: [
-        { value: 'color', label: 'Сплошной цвет' },
-        { value: 'image', label: 'Картинка по ссылке' },
-      ],
-    },
-    { key: 'color', type: 'color', label: 'Цвет' },
-    { key: 'imageUrl', type: 'text', label: 'Ссылка на картинку', placeholder: 'https://…/bg.png' },
-    {
-      key: 'disableSeasonalCss',
-      type: 'boolean',
-      label: 'Отключить сезонный скин сайта',
-      hint: 'Убирает сезонные стили: шапку, боковины и фон оформления.',
-    },
   ],
 
   styles: function (s) {
     var bg = backgroundValue(s);
     var css = [];
-    if ((s.target === 'field' || s.target === 'both') && !require('core/uwu').hasFieldBackground()) {
+    if (!require('core/uwu').hasFieldBackground()) {
       // background целиком, чтобы убить и инлайновый background-image локации.
       css.push('#cages_div { background: ' + bg + ' !important; }');
-    }
-    if (s.target === 'page' || s.target === 'both') {
-      css.push('html, body { background: ' + bg + ' !important; }');
     }
     return css.join('\n');
   },

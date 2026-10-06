@@ -2,11 +2,13 @@
 /**
  * Сборка юзерскрипта без внешних зависимостей.
  *
- * Полный бандл: каждый .js из src/ (кроме шапок) оборачивается в фабрику CommonJS-lite.
- * Бандл ЛУ: то же ядро src/core/ и данные src/data/, плюс отобранные модули
- * (список в VARIANTS ниже).
+ * full — модульный бандл: каждый .js из src/ (кроме шапок и standalone/)
+ * оборачивается в фабрику CommonJS-lite.
  *   __def('core/storage', function (require, module, exports) { ...тело файла... });
  * Порядок файлов в бандле не важен: require() ленивый.
+ *
+ * lu — standalone-бандл «Кач ЛУ»: шапка + содержимое src/standalone/klu.js
+ * как есть (самодостаточный IIFE, без __def-фабрик).
  *
  * Запуск: node build.js [--watch]
  */
@@ -24,29 +26,14 @@ const DOCS_DIR = path.join(ROOT, 'docs');
 const HEADER_FILE = path.join(SRC, 'header.txt');
 const ENTRY = 'core/bootstrap';
 
-/** full — все модули; lu — ядро и только поле для ЛУ. */
+/** full — все модули; lu — standalone «Кач ЛУ». */
 const VARIANTS = [
   { id: 'full', headerFile: HEADER_FILE, baseName: 'catwar-balconette' },
   {
     id: 'lu',
     headerFile: path.join(SRC, 'header-lu.txt'),
     baseName: 'catwar-balconette-lu',
-    // ЛУ-вариант: поле для ЛУ + отобранные модули основного скрипта
-    // (координаты клеток, кот↔действия, старые иконки, автопрокрутка,
-    // ID в ЛС, уведомления, редиректы, статичный фон, погода).
-    modules: [
-      'climbing-field',
-      'cell-coords',
-      'layout-swap',
-      'old-icons',
-      'history-autoscroll',
-      'pm-ids',
-      'notifications',
-      'domain-redirect',
-      'domain-redirect-reverse',
-      'static-background',
-      'hide-weather',
-    ],
+    standalone: 'standalone/klu',
   },
 ];
 
@@ -55,12 +42,15 @@ function userscriptMeta(header) {
   return (match ? match[0] : header).trimEnd() + '\n';
 }
 
-/** Рекурсивный обход src/ за .js файлами. */
+/** Рекурсивный обход src/ за .js файлами (исключая standalone/). */
 function collect(dir, acc = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) collect(full, acc);
-    else if (entry.isFile() && entry.name.endsWith('.js')) acc.push(full);
+    if (entry.isDirectory()) {
+      if (entry.name !== 'standalone') collect(full, acc);
+    } else if (entry.isFile() && entry.name.endsWith('.js')) {
+      acc.push(full);
+    }
   }
   return acc;
 }
@@ -76,16 +66,8 @@ function indent(text, pad) {
     .join('\n');
 }
 
-function filesForVariant(variant) {
-  const files = collect(SRC);
-  if (!variant.modules) return files;
-  const allow = new Set(variant.modules.map((id) => 'modules/' + id));
-  return files.filter((file) => {
-    const name = moduleName(file);
-    if (name.startsWith('modules/')) return allow.has(name);
-    // Ядро и данные (например, src/data/old-icons.js для модуля old-icons).
-    return name.startsWith('core/') || name.startsWith('data/');
-  });
+function filesForVariant() {
+  return collect(SRC);
 }
 
 function bundleSource(header, version, variantId, files) {
@@ -147,22 +129,48 @@ function bundleSource(header, version, variantId, files) {
   ].join('\n');
 }
 
+/** Сборка standalone-бандла (шапка + код как есть). */
+function bundleStandalone(header, version, variantId, codePath) {
+  const code = fs.readFileSync(codePath, 'utf8').replace(/\s+$/, '');
+  return [
+    header,
+    '',
+    '/* eslint-disable */',
+    '/* Собрано автоматически: src/standalone/klu.js + шапка. Не редактировать руками. */',
+    '',
+    code,
+    '',
+  ].join('\n');
+}
+
 function buildVariant(variant) {
   const header = fs.readFileSync(variant.headerFile, 'utf8').trimEnd();
   const versionMatch = header.match(/^\/\/\s*@version\s+(\S+)/m);
   const version = versionMatch ? versionMatch[1] : '0.0.0';
 
-  const files = filesForVariant(variant);
-  if (!files.length) throw new Error('В src/ не найдено ни одного .js файла для ' + variant.id);
+  let out;
+  let fileCount;
 
-  const names = files.map(moduleName);
-  if (!names.includes(ENTRY)) throw new Error(`Нет точки входа src/${ENTRY}.js`);
+  if (variant.standalone) {
+    const codePath = path.join(SRC, variant.standalone + '.js');
+    if (!fs.existsSync(codePath)) throw new Error('Standalone-файл не найден: ' + codePath);
+    out = bundleStandalone(header, version, variant.id, codePath);
+    fileCount = 1;
+    new vm.Script(out, { filename: variant.baseName + '.user.js' });
+  } else {
+    const files = filesForVariant();
+    if (!files.length) throw new Error('В src/ не найдено ни одного .js файла для ' + variant.id);
 
-  const out = bundleSource(header, version, variant.id, files);
-  const userName = variant.baseName + '.user.js';
-  new vm.Script(out, { filename: userName });
+    const names = files.map(moduleName);
+    if (!names.includes(ENTRY)) throw new Error(`Нет точки входа src/${ENTRY}.js`);
+
+    out = bundleSource(header, version, variant.id, files);
+    fileCount = files.length;
+    new vm.Script(out, { filename: variant.baseName + '.user.js' });
+  }
 
   const meta = userscriptMeta(header);
+  const userName = variant.baseName + '.user.js';
   const metaName = variant.baseName + '.meta.js';
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.mkdirSync(DOCS_DIR, { recursive: true });
@@ -172,7 +180,7 @@ function buildVariant(variant) {
   fs.writeFileSync(path.join(DOCS_DIR, metaName), meta, 'utf8');
 
   const kb = (Buffer.byteLength(out, 'utf8') / 1024).toFixed(1);
-  console.log(`[build] dist/${userName} — ${files.length} файлов, ${kb} КБ, версия ${version}, вариант ${variant.id}`);
+  console.log(`[build] dist/${userName} — ${fileCount} файл(ов), ${kb} КБ, версия ${version}, вариант ${variant.id}`);
   return version;
 }
 

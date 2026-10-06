@@ -2,9 +2,9 @@
 // @name         CatWar Balconette
 // @name:ru      CatWar Balconette
 // @namespace    catwar-balconette
-// @version      0.1.8
-// @description  Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
-// @description:ru Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
+// @version      0.2.0
+// @description  Поле для ЛУ, координаты клеток, кот ↔ действия, старые иконки, автопрокрутка истории, ID в личных сообщениях, уведомления, редиректы доменов, статичный фон, погода.
+// @description:ru Поле для ЛУ, координаты клеток, кот ↔ действия, старые иконки, автопрокрутка истории, ID в личных сообщениях, уведомления, редиректы доменов, статичный фон, погода.
 // @author       balconette
 // @license      MIT
 // @homepageURL  https://cw-mod.github.io/balconette-mode/
@@ -30,9 +30,9 @@
 (function () {
   'use strict';
 
-  var CWB_VERSION = "0.1.8";
+  var CWB_VERSION = "0.2.0";
   var CWB_VARIANT = "full";
-  var CWB_MODULE_IDS = ["action-title","always-day","cell-coords","climbing-field","clock","copy-id","domain-redirect-reverse","domain-redirect","grid","hide-cat-tooltip","hide-weather","highlight-moves","history-autoscroll","hunt-smell-square","layout-swap","mouth-cat-ids","mouth-item-ids","notifications","old-icons","param-info","pm-ids","skill-fractions","sounds","static-background"];
+  var CWB_MODULE_IDS = ["cell-coords","climbing-field","domain-redirect-reverse","domain-redirect","hide-weather","history-autoscroll","layout-swap","notifications","old-icons","pm-ids","static-background"];
 
   var __factories = Object.create(null);
   var __cache = Object.create(null);
@@ -140,7 +140,7 @@
      * Точка входа.
      *
      * Порядок:
-     *   1. document-start: определяем страницу, при желании ставим хук сокета;
+     *   1. document-start: определяем страницу, ставим хук сокета на игровой странице;
      *   2. DOMContentLoaded: поднимаем логгер, регистрируем модули, монтируем панель;
      *   3. если страница игровая — ждём Vue (но не блокируем CSS-модули).
      */
@@ -219,8 +219,8 @@
         console.info('[CWB] CatWar Balconette v' + meta.version + ' на странице «' + page + '». Кнопка «⚙ моды» справа, либо Ctrl+Alt+B.');
       } catch (e) { /* консоль недоступна */ }
 
-      // Хук сокета имеет смысл ставить только до загрузки бандла игры.
-      if (cfg.socketHook && page === 'game') {
+      // Хук сокета ставим безусловно на игровой странице, до загрузки бандла игры.
+      if (page === 'game') {
         try { require('core/socket').install(); } catch (e) { log.root.warn('хук сокета не встал', e); }
       }
 
@@ -265,7 +265,8 @@
   /* src/core/config.js */
   __def("core/config", function (require, module, exports) {
     /**
-     * Настройки самого ядра (не модулей). Лежат в одном ключе `cwb:core`.
+     * Настройки самого ядра (не модулей). Сейчас только logLevel.
+     * Лежат в одном ключе `cwb:core`.
      */
 
     var storage = require('core/storage');
@@ -274,26 +275,9 @@
 
     var DEFAULTS = {
       logLevel: 'silent',       // silent | error | warn | info | debug
-      gearCorner: 'bottom-right', // положение кнопки-шестерёнки
-      gearHidden: false,        // спрятать шестерёнку (панель тогда только по хоткею)
-      hotkey: true,             // Ctrl+Alt+B открывает панель
-      socketHook: false,        // ранний хук WebSocket — опциональный механизм «на будущее»
     };
 
     var SCHEMA = [
-      {
-        key: 'gearCorner',
-        type: 'select',
-        label: 'Положение кнопки настроек',
-        options: [
-          { value: 'bottom-right', label: 'Внизу справа' },
-          { value: 'bottom-left', label: 'Внизу слева' },
-          { value: 'top-right', label: 'Вверху справа' },
-          { value: 'top-left', label: 'Вверху слева' },
-        ],
-      },
-      { key: 'gearHidden', type: 'boolean', label: 'Спрятать кнопку-шестерёнку', hint: 'Панель всё равно откроется по Ctrl+Alt+B' },
-      { key: 'hotkey', type: 'boolean', label: 'Открывать панель по Ctrl+Alt+B' },
       {
         key: 'logLevel',
         type: 'select',
@@ -306,17 +290,19 @@
           { value: 'debug', label: 'Отладка' },
         ],
       },
-      {
-        key: 'socketHook',
-        type: 'boolean',
-        label: 'Хук игрового сокета (экспериментально)',
-        hint: 'Пока никому не нужен. После включения перезагрузи страницу. На сервер ничего не шлёт.',
-      },
     ];
 
     function all() {
       var stored = storage.get(KEY, null);
-      return Object.assign({}, DEFAULTS, stored && typeof stored === 'object' ? stored : {});
+      var out = Object.assign({}, DEFAULTS);
+      if (stored && typeof stored === 'object') {
+        for (var key in DEFAULTS) {
+          if (Object.prototype.hasOwnProperty.call(DEFAULTS, key) && key in stored) {
+            out[key] = stored[key];
+          }
+        }
+      }
+      return out;
     }
 
     function get(key) {
@@ -1144,7 +1130,7 @@
      * и импорт одинаковы для обоих бэкендов.
      *
      * Схема ключей (см. SPEC.md, раздел «Соглашения»):
-     *   cwb:core          — настройки ядра  { logLevel, gearCorner, socketHook, ... }
+     *   cwb:core          — настройки ядра  { logLevel }
      *   cwb:mod.<id>      — состояние модуля { enabled: bool, opt: { ... } }
      */
 
@@ -1408,17 +1394,10 @@
     var registry = require('core/registry');
     var storage = require('core/storage');
     var config = require('core/config');
-    var uwu = require('core/uwu');
     var meta = require('cwb:meta');
-    var IS_LU = meta.variant === 'lu';
 
     var ROOT_ID = 'cwb-root';
     var STYLE_ID = 'core-ui';
-
-    var TABS = [
-      { id: 'new', title: 'Новые', hint: 'То, чего в UwU нет' },
-      { id: 'overlay', title: 'Надстройки над UwU', hint: 'Наши штуки поверх / вместо аналогов UwU' },
-    ];
 
     var state = {
       root: null,
@@ -1426,10 +1405,7 @@
       overlay: null,
       listEl: null,
       searchEl: null,
-      tabsEl: null,
-      noteEl: null,
       query: '',
-      tab: meta.variant === 'lu' ? 'overlay' : 'new',
       open: false,
       offRegistry: null,
       offKeys: [],
@@ -1445,17 +1421,12 @@
         'font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#1c1c1e;}',
         '#cwb-root *{box-sizing:border-box;}',
 
-        '.cwb-gear{position:fixed;z-index:2147483647;pointer-events:auto;',
+        '.cwb-gear{position:fixed;right:0;bottom:72px;z-index:2147483647;pointer-events:auto;',
         'min-width:44px;height:36px;padding:0 10px;border-radius:18px 0 0 18px;',
         'border:1px solid #3d3224;cursor:pointer;background:#e8c27a;color:#2a1f12;',
         'font:600 13px/34px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;',
         'box-shadow:0 2px 12px rgba(0,0,0,.45);opacity:1;transition:transform .15s,filter .15s;}',
         '.cwb-gear:hover{filter:brightness(1.08);}',
-        '.cwb-gear[hidden]{display:none;}',
-        '.cwb-gear.cwb-bottom-right,.cwb-gear.cwb-top-right{right:0;border-radius:18px 0 0 18px;}',
-        '.cwb-gear.cwb-bottom-left,.cwb-gear.cwb-top-left{left:0;border-radius:0 18px 18px 0;}',
-        '.cwb-gear.cwb-bottom-right,.cwb-gear.cwb-bottom-left{bottom:72px;}',
-        '.cwb-gear.cwb-top-right,.cwb-gear.cwb-top-left{top:72px;}',
 
         '.cwb-overlay{position:fixed;inset:0;z-index:2147483646;pointer-events:auto;background:rgba(0,0,0,.45);',
         'display:flex;align-items:center;justify-content:center;padding:24px;}',
@@ -1474,15 +1445,6 @@
         '.cwb-x:hover{opacity:1;}',
 
         '.cwb-body{flex:1 1 auto;overflow-y:auto;padding:8px 14px 14px;}',
-
-        '.cwb-tabs{display:flex;gap:6px;padding:8px 14px 0;background:#fdfbf7;flex:0 0 auto;}',
-        '.cwb-tab{flex:1 1 0;min-width:0;padding:7px 10px;border:1px solid #d6cbb8;border-radius:8px;',
-        'background:#fff;cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;color:#3d3224;}',
-        '.cwb-tab:hover{background:#f0e9db;}',
-        '.cwb-tab[aria-selected="true"]{background:#e8c27a;border-color:#e8c27a;color:#2a1f12;}',
-        '.cwb-tab-note{padding:6px 14px 0;font-size:11.5px;color:#8a7f70;flex:0 0 auto;}',
-        '.cwb-uwu-banner{margin:6px 0 10px;padding:8px 10px;border-radius:8px;background:#f4efe4;',
-        'border:1px solid #e6ddcd;font-size:12px;color:#5c5348;}',
 
         '.cwb-cat{margin-top:14px;}',
         '.cwb-cat:first-child{margin-top:4px;}',
@@ -1651,17 +1613,7 @@
             registry.setSetting(mod.id, item.key, value);
           }));
         });
-        if (!IS_LU) {
-          opts.appendChild(dom.el('div', { class: 'cwb-opt' }, [
-            dom.el('button', {
-              class: 'cwb-btn',
-              type: 'button',
-              text: 'Сбросить настройки',
-              onclick: function () { registry.resetSettings(mod.id); render(); },
-            }),
-          ]));
         }
-      }
 
       var sw = dom.el('label', { class: 'cwb-sw' }, [
         dom.el('input', { type: 'checkbox', checked: enabled ? true : null }),
@@ -1676,7 +1628,6 @@
           dom.el('div', { class: 'cwb-mod-main' }, [
             dom.el('div', { class: 'cwb-mod-name', text: mod.title }),
             mod.description ? dom.el('div', { class: 'cwb-mod-desc', text: mod.description }) : null,
-            compatHint(mod),
             mod.warning ? dom.el('div', { class: 'cwb-mod-warn', text: '⚠ ' + mod.warning }) : null,
           ]),
           sw,
@@ -1699,55 +1650,17 @@
         dom.el('div', { class: 'cwb-mod-head' }, [
           dom.el('div', { class: 'cwb-mod-main' }, [
             dom.el('div', { class: 'cwb-mod-name', text: 'Ядро' }),
-            dom.el('div', { class: 'cwb-mod-desc', text: 'Кнопка панели, логи, хук сокета.' }),
+            dom.el('div', { class: 'cwb-mod-desc', text: 'Логи скрипта в консоли.' }),
           ]),
         ]),
         opts,
       ]);
     }
 
-    function compatHint(mod) {
-      if (uwu.tabOf(mod) !== 'overlay') return null;
-      var text = uwu.hintFor(mod.id);
-      if (!text) return null;
-      return dom.el('div', { class: 'cwb-mod-desc', text: text });
-    }
-
     function matchesQuery(mod, query) {
       if (!query) return true;
       var hay = (mod.title + ' ' + mod.description + ' ' + mod.id).toLowerCase();
       return hay.indexOf(query) >= 0;
-    }
-
-    function matchesTab(mod, tab) {
-      return uwu.tabOf(mod) === tab;
-    }
-
-    function currentTabMeta() {
-      for (var i = 0; i < TABS.length; i++) {
-        if (TABS[i].id === state.tab) return TABS[i];
-      }
-      return TABS[0];
-    }
-
-    function paintTabs() {
-      if (!state.tabsEl) return;
-      state.tabsEl.querySelectorAll('.cwb-tab').forEach(function (btn) {
-        var on = btn.getAttribute('data-cwb-tab') === state.tab;
-        btn.setAttribute('aria-selected', on ? 'true' : 'false');
-      });
-      if (state.noteEl) {
-        var metaTab = currentTabMeta();
-        var note = metaTab.hint;
-        if (state.tab === 'overlay') {
-          if (uwu.present()) {
-            note = 'UwU найден (' + uwu.sourceLabel() + '). Смотрим их настройки, своё туда не пишем.';
-          } else {
-            note = metaTab.hint + '. UwU нет — модули работают сами.';
-          }
-        }
-        state.noteEl.textContent = note;
-      }
     }
 
     /** Чтобы input не терял фокус при registry.onChange → render(). */
@@ -1793,23 +1706,14 @@
       var focusHint = captureFocusHint();
       var query = state.query.trim().toLowerCase();
       state.listEl.textContent = '';
-      if (!IS_LU) paintTabs();
 
-      if (!query && (IS_LU || state.tab === 'new')) state.listEl.appendChild(coreCard());
-      if (!query && !IS_LU && state.tab === 'overlay') {
-        state.listEl.appendChild(dom.el('div', {
-          class: 'cwb-uwu-banner',
-          text: uwu.present()
-            ? 'UwU уже рядом. Что у них включено, второй раз не дублируем. Карты ЛУ можно забрать в «Поле для ЛУ».'
-            : 'UwU нет. Надстройки работают сами. Если включишь оба мода, часть вещей не будет дублироваться.',
-        }));
-      }
+      if (!query) state.listEl.appendChild(coreCard());
 
       var shown = 0;
       registry.CATEGORIES.forEach(function (cat) {
         var mods = registry.list().filter(function (m) {
           if (m.category !== cat.id || !matchesQuery(m, query)) return false;
-          return query || IS_LU ? true : matchesTab(m, state.tab);
+          return true;
         });
         if (!mods.length) return;
         shown += mods.length;
@@ -1859,12 +1763,7 @@
     }
 
     function applyCoreSettings() {
-      var cfg = config.all();
-      if (state.gear) {
-        state.gear.className = 'cwb-gear cwb-' + cfg.gearCorner;
-        state.gear.hidden = !!cfg.gearHidden;
-      }
-      require('core/log').setLevel(cfg.logLevel);
+      require('core/log').setLevel(config.all().logLevel);
     }
 
     /** Гасим клавиатуру внутри панели, чтобы не срабатывали хоткеи игры. */
@@ -1894,29 +1793,6 @@
       var search = dom.el('input', { class: 'cwb-search', type: 'search', placeholder: 'Поиск по модулям…' });
       search.addEventListener('input', function (e) { state.query = e.target.value; render(); });
 
-      var tabs = null;
-      var tabNote = null;
-      if (!IS_LU) {
-        tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
-        TABS.forEach(function (tab) {
-          var btn = dom.el('button', {
-            class: 'cwb-tab',
-            type: 'button',
-            role: 'tab',
-            'data-cwb-tab': tab.id,
-            'aria-selected': tab.id === state.tab ? 'true' : 'false',
-            text: tab.title,
-          });
-          btn.addEventListener('click', function () {
-            if (state.tab === tab.id) return;
-            state.tab = tab.id;
-            render();
-          });
-          tabs.appendChild(btn);
-        });
-        tabNote = dom.el('div', { class: 'cwb-tab-note' });
-      }
-
       var list = dom.el('div', { class: 'cwb-body' });
 
       var modalChildren = [
@@ -1926,12 +1802,8 @@
           search,
           dom.el('button', { class: 'cwb-x', type: 'button', title: 'Закрыть', text: '×', onclick: close }),
         ]),
+        list,
       ];
-      if (tabs) {
-        modalChildren.push(tabs);
-        modalChildren.push(tabNote);
-      }
-      modalChildren.push(list);
       modalChildren.push(dom.el('div', { class: 'cwb-foot' }, [
         dom.el('button', {
           class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
@@ -1970,15 +1842,12 @@
       state.overlay = overlay;
       state.listEl = list;
       state.searchEl = search;
-      state.tabsEl = tabs;
-      state.noteEl = tabNote;
 
       isolateKeyboard(root);
 
       // Esc закрывает панель; хоткей открытия — Ctrl+Alt+B.
       state.offKeys.push(dom.on(document, 'keydown', function (e) {
         if (state.open && e.key === 'Escape') { close(); e.stopPropagation(); return; }
-        if (!config.get('hotkey')) return;
         if (e.ctrlKey && e.altKey && (e.key === 'b' || e.key === 'B' || e.code === 'KeyB')) {
           e.preventDefault();
           e.stopPropagation();
@@ -2033,7 +1902,6 @@
       if (state.root && state.root.parentNode) state.root.remove();
       dom.removeStyle(STYLE_ID);
       state.root = state.gear = state.overlay = state.listEl = state.searchEl = null;
-      state.tabsEl = state.noteEl = null;
       state.open = false;
     }
 
@@ -2046,7 +1914,6 @@
       toggle: toggle,
       render: render,
       toast: toast,
-      TABS: TABS,
     };
   });
 
@@ -2065,19 +1932,14 @@
     var STORE_KEYS = [
       'uwu_settings',
       'uwu_fastStyles',
-      'uwu_fastStyles_hideCatTooltip',
       'uwu_climbingPanelState',
       'uwu_climbingPanelStatus',
-      'uwu_clock',
-      'uwu_layoutSettings',
     ];
 
     var DOM_IDS = [
       'uwusettings',
       'uwu-climbingMainPanel',
       'uwu-climbingPanel',
-      'uwu-clock',
-      'uwu-fast-style-hideCatTooltip',
       'uwu-fast-style-hideSky',
       'cellsBordersStyle',
     ];
@@ -2087,38 +1949,11 @@
      * hint показывается в карточке надстройки.
      */
     var OVERLAY = {
-      'always-day': {
-        hint: 'В UwU — «Всегда день/ярко». Дневное небо — наше. Если у них уже включено, наше поле не трогаем.',
-      },
-      'grid': {
-        hint: 'В UwU — «Границы клеток». Если они включены, нашу сетку не рисуем.',
-      },
       'static-background': {
         hint: 'В UwU — «Статичный фон локации». Если он включён, фон поля не трогаем, фон страницы остаётся нашим.',
       },
       'hide-weather': {
         hint: 'В UwU быстрый стиль «Скрыть небо». Если небо уже спрятано, наше не дублируем.',
-      },
-      'hide-cat-tooltip': {
-        hint: 'В UwU есть быстрый стиль «скрыть окно О коте». Если уже скрыто, наше не вешаем.',
-      },
-      'clock': {
-        hint: 'В UwU — свои часы. Два виджета сразу налезают друг на друга: выключи одни.',
-      },
-      'action-title': {
-        hint: 'В UwU — «Дублировать время в заголовке вкладки». Если оно включено, заголовок не трогаем.',
-      },
-      'skill-fractions': {
-        hint: 'В UwU — «Точные значения навыков». Если включено, наши дроби не рисуем.',
-      },
-      'param-info': {
-        hint: 'В UwU — «Подробные параметры» (кнопка над блоком). Наша карточка по клику на навык — рядом, не вместо.',
-      },
-      'sounds': {
-        hint: 'В UwU свой набор звуков (ЛС, конец действия, рот, блок). В их настройки не лезем. Если оба мода включены, звуки могут наложиться — выключи дубли там или здесь.',
-      },
-      'hunt-smell-square': {
-        hint: 'В UwU — «Описывать запах на охоте». Если включено, нашу подсказку не вешаем.',
       },
       'climbing-field': {
         hint: 'В UwU — «Минное поле». Кач ЛУ, цифра из [треск] и автоярусы — наши. Поле красим из нашей карты, даже если у них включён перенос. Карты можно забрать из их localStorage.',
@@ -2164,10 +1999,7 @@
     }
 
     function fastStyle(key) {
-      if (fastStyles()[key]) return true;
-      // старый одиночный ключ
-      if (key === 'hideCatTooltip' && readLocal('uwu_fastStyles_hideCatTooltip')) return true;
-      return false;
+      return !!fastStyles()[key];
     }
 
     function hasDom() {
@@ -2764,198 +2596,6 @@
   });
 
   /* ====================================================================== */
-  /* src/modules/action-title.js */
-  __def("modules/action-title", function (require, module, exports) {
-    /**
-     * Остаток времени до конца действия в заголовке вкладки.
-     *
-     * Как в CW Mod (`cw3_act_end_in_title`) и CW Shed (`$('title').text(time + " / " + action)`),
-     * но без парсинга #block_mess: берём `cat.actionEnds` (unix) и `cat.actionMess` из Vue.
-     */
-
-    var DEFAULT_TITLE = 'Игровая / CatWar';
-
-    function pad(n) {
-      return n < 10 ? '0' + n : String(n);
-    }
-
-    function formatLeft(sec) {
-      if (sec < 0) sec = 0;
-      var h = Math.floor(sec / 3600);
-      var m = Math.floor((sec % 3600) / 60);
-      var s = sec % 60;
-      if (h > 0) return h + ' ч ' + m + ' мин ' + s + ' с';
-      if (m > 0) return m + ' мин ' + s + ' с';
-      return s + ' с';
-    }
-
-    function shortMess(text) {
-      var t = String(text || '').replace(/\s+/g, ' ').trim();
-      if (!t) return '';
-      // Берём первую фразу без самого таймера, если он вдруг попал в mess.
-      t = t.replace(/(?:\d+\s*ч\s*)?(?:\d+\s*мин\s*)?\d+\s*с\.?/gi, '').trim();
-      if (t.length > 48) t = t.slice(0, 46) + '…';
-      return t;
-    }
-
-    module.exports = {
-      id: 'action-title',
-      title: 'Таймер действия в заголовке',
-      description: 'Пока идёт действие, во вкладке браузера видно, сколько осталось.',
-      category: 'interface',
-      pages: ['game', 'hunt'],
-      enabledByDefault: false,
-      order: 15,
-
-      defaults: {
-        showName: true,
-      },
-
-      schema: [
-        {
-          key: 'showName',
-          type: 'boolean',
-          label: 'Писать название действия рядом со временем',
-          hint: 'Как в Shed: «1 мин 12 с / Вылизаться». Без галочки — только время, как в CW Mod.',
-        },
-      ],
-
-      init: function (ctx) {
-        if (require('core/uwu').hasTitleTimer()) {
-          ctx.log.info('UwU уже пишет таймер в заголовок — пропускаем');
-          return;
-        }
-        var baseTitle = document.title || DEFAULT_TITLE;
-        var weOwnTitle = false;
-
-        function endsUnix() {
-          var raw = ctx.vue.get('cat.actionEnds');
-          var n = Number(raw);
-          return n > 0 ? n : 0;
-        }
-
-        function leftSec() {
-          var ends = endsUnix();
-          if (!ends) return 0;
-          // actionEnds — unix в секундах; если вдруг пришло в мс, нормализуем.
-          if (ends > 1e12) ends = Math.floor(ends / 1000);
-          return Math.max(0, ends - Math.floor(Date.now() / 1000));
-        }
-
-        function paint() {
-          if (ctx.isDisposed()) return;
-          var left = leftSec();
-          var mess = ctx.vue.get('cat.actionMess') || '';
-          var busy = left > 0 || !!String(mess).trim();
-
-          if (!busy) {
-            if (weOwnTitle) {
-              document.title = baseTitle;
-              weOwnTitle = false;
-            }
-            return;
-          }
-
-          if (!weOwnTitle) {
-            baseTitle = document.title || DEFAULT_TITLE;
-            weOwnTitle = true;
-          }
-
-          var time = formatLeft(left);
-          var name = ctx.settings.get('showName') ? shortMess(mess) : '';
-          document.title = name ? time + ' / ' + name : time;
-        }
-
-        ctx.addCleanup(function () {
-          if (weOwnTitle) document.title = baseTitle;
-        });
-
-        return ctx.whenVueReady().then(function (vm) {
-          if (!vm || ctx.isDisposed()) return;
-          paint();
-          ctx.interval(paint, 1000);
-          ctx.watch('cat.actionEnds', paint);
-          ctx.watch('cat.actionMess', paint);
-        });
-      },
-    };
-  });
-
-  /* ====================================================================== */
-  /* src/modules/always-day.js */
-  __def("modules/always-day", function (require, module, exports) {
-    /**
-     * «Всегда день».
-     *
-     * Как игра рисует ночь (по разбору бандла, research/NEW_SITE.md §4):
-     *  1. `weather.light` = 0.6…1 в зависимости от часа, и это значение уходит
-     *     инлайновым стилем в `#cages_div { opacity: … }`. Никакого класса `night`
-     *     и никакого filter нет. Значит перебиваем стилем с !important —
-     *     инлайн-стиль проигрывает `!important` из таблицы стилей.
-     *  2. `#sky` получает картинку /cw3/sky/N.png, где N зависит от связки
-     *     зима/ночь/дождь. Ночные индексы 3,4,6,8 — дневные пары к ним 1,2,5,7.
-     *
-     * Пункт 1 — чистый CSS, включён всегда. Пункт 2 нельзя выразить CSS-ом,
-     * не зная погоды, поэтому он опционален и делается точечной правкой
-     * отображаемого поля `weather.sky` (это поле только про картинку, на игру
-     * оно не влияет и на сервер ничего не уходит).
-     */
-
-    // ночной индекс неба -> дневной аналог
-    var NIGHT_TO_DAY = { 3: 1, 4: 2, 6: 5, 8: 7, 18: 17 };
-
-    module.exports = {
-      id: 'always-day',
-      title: 'Всегда день',
-      description: 'Убирает ночное затемнение игрового поля.',
-      category: 'field',
-      pages: ['game'],
-      enabledByDefault: false,
-      order: 10,
-
-      defaults: {
-        daySky: false,
-      },
-
-      schema: [
-        {
-          key: 'daySky',
-          type: 'boolean',
-          label: 'Дневное небо над полем',
-          hint: 'Меняет ночную картинку неба на дневную того же сезона и погоды.',
-        },
-      ],
-
-      styles: function () {
-        var uwu = require('core/uwu');
-        // Тот же CSS, что updateAlwaysDayStyle в UwU — не дублируем.
-        if (uwu.hasAlwaysDay()) return '';
-        return '#cages_div { opacity: 1 !important; }';
-      },
-
-      init: function (ctx) {
-        if (!ctx.settings.get('daySky')) return;
-
-        function fixSky() {
-          var state = ctx.vue.getState();
-          var weather = state && state.weather;
-          if (!weather) return;
-          var day = NIGHT_TO_DAY[weather.sky];
-          // Присваиваем, только если индекс реально ночной — иначе зациклимся.
-          if (day !== undefined && weather.sky !== day) weather.sky = day;
-        }
-
-        // Vue монтируется позже нас: ждём, но молча.
-        return ctx.whenVueReady().then(function (vm) {
-          if (!vm || ctx.isDisposed()) return;
-          fixSky();
-          ctx.watch('weather.sky', fixSky);
-        });
-      },
-    };
-  });
-
-  /* ====================================================================== */
   /* src/modules/cell-coords.js */
   __def("modules/cell-coords", function (require, module, exports) {
     /**
@@ -2965,9 +2605,6 @@
      * При нюхе и перерисовке поля оверлей перевешивается по $watch field.map.
      * См. CORRECTIONS.md и RUNTIME.md §8.10.
      */
-
-    var IS_LU = false;
-    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
 
     var SEL_TABLE = '#cages';
     var SEL_CELL = SEL_TABLE + ' td.cage';
@@ -2995,10 +2632,7 @@
         hideInSmell: true,
       },
 
-      schema: IS_LU ? [] : [
-        { key: 'showTree', type: 'boolean', label: 'Показывать ярус дерева' },
-        { key: 'hideInSmell', type: 'boolean', label: 'Скрывать в режиме нюха' },
-      ],
+      schema: [],
 
       styles: function () {
         return [
@@ -3535,15 +3169,13 @@
       return tds[(y - 1) * COLS + (x - 1)] || null;
     }
 
-    var IS_LU = require('cwb:meta').variant === 'lu';
-
     module.exports = {
       id: 'climbing-field',
       title: 'Поле для ЛУ',
       description: 'Минное поле 10×6: вкладки, локации, цифры треска, мины и переходы. Карты не слетают после обновления.',
       category: 'field',
       pages: ['game'],
-      enabledByDefault: IS_LU,
+      enabledByDefault: false,
       order: 25,
 
       defaults: {
@@ -3559,7 +3191,7 @@
         clearOnLocation: false,
       },
 
-      schema: IS_LU ? [
+      schema: [
         {
           key: 'blockDangerous',
           type: 'boolean',
@@ -3571,60 +3203,6 @@
           type: 'boolean',
           label: 'Ставить цифру в клетку кота по треску в чате',
           hint: 'Берёт громкость из [треск] (0–7) и ставит в клетку, где стоит твой кот. Обычные системные реплики не считает.',
-        },
-        {
-          key: 'mapsEditor',
-          type: 'custom',
-          label: 'Вкладки и поля',
-          hint: 'Добавить, удалить или переименовать вкладки и таблицы внутри выбранной вкладки.',
-          render: renderMapsEditor,
-        },
-      ] : [
-        {
-          key: 'overlay',
-          type: 'boolean',
-          label: 'Дублировать пометки на игровом поле',
-          hint: 'Цвета и цифры на клетках игры — из этой карты, даже если рядом UwU.',
-        },
-        {
-          key: 'blockDangerous',
-          type: 'boolean',
-          label: 'Кач ЛУ: не нажимать на опасные клетки',
-          hint: 'Не даёт кликнуть и пойти с клавиатуры (WASD, QEZX) на мины, опаски и unsafe. Выключи, если хочешь ходить как обычно.',
-        },
-        {
-          key: 'uwuSync',
-          type: 'select',
-          label: 'Живая карта UwU',
-          hint: 'Новая пометка сразу пишется в открытую таблицу UwU, без экспорта. «Только UwU» прячет нашу панель и вешает «Кач ЛУ» на их минник.',
-          options: [
-            { value: 'off', label: 'Не синхронизировать' },
-            { value: 'both', label: 'Писать и к нам, и в UwU' },
-            { value: 'uwu', label: 'Только в UwU, нашу панель скрыть' },
-          ],
-        },
-        {
-          key: 'autoFromServer',
-          type: 'boolean',
-          label: 'Подтягивать ярусы деревьев из игры',
-          hint: 'Если игра уже знает ярус — пустые клетки заполнятся сами.',
-        },
-        {
-          key: 'autoFromChat',
-          type: 'boolean',
-          label: 'Ставить цифру в клетку кота по треску в чате',
-          hint: 'Берёт громкость из [треск] (0–7) и ставит в клетку, где стоит твой кот. Обычные системные реплики не считает.',
-        },
-        {
-          key: 'showSkill',
-          type: 'boolean',
-          label: 'Показывать своё лазание в шапке панели',
-        },
-        {
-          key: 'clearOnLocation',
-          type: 'boolean',
-          label: 'Очищать текущее поле при смене локации',
-          hint: 'По умолчанию выключено. Карты лежат во вкладках и не пропадают после обновления.',
         },
         {
           key: 'mapsEditor',
@@ -3749,17 +3327,14 @@
         var tabsEl = dom.el('div', { id: 'cwb-lu-tabs' });
         var fieldsEl = dom.el('div', { id: 'cwb-lu-fields' });
         var overlayInput = dom.el('input', { type: 'checkbox', checked: !!ctx.settings.get('overlay') });
-        var overlayLabel = IS_LU ? dom.el('label', {
+        var overlayLabel = dom.el('label', {
           id: 'cwb-lu-overlay',
           title: 'Дублировать пометки (безопасно/мина/переход) и цифры на клетках игрового поля',
-        }, [overlayInput, document.createTextNode(' Переносить на игровую')]) : null;
-        if (overlayLabel) {
-          overlayLabel.addEventListener('change', function (e) {
-            if (e.target === overlayInput) ctx.settings.set('overlay', e.target.checked);
-          });
-        }
-        var navChildren = [dom.el('h3', { text: 'Вкладка' }), tabsEl, dom.el('h3', { text: 'Локация' }), fieldsEl];
-        if (overlayLabel) navChildren.unshift(overlayLabel);
+        }, [overlayInput, document.createTextNode(' Переносить на игровую')]);
+        overlayLabel.addEventListener('change', function (e) {
+          if (e.target === overlayInput) ctx.settings.set('overlay', e.target.checked);
+        });
+        var navChildren = [overlayLabel, dom.el('h3', { text: 'Вкладка' }), tabsEl, dom.el('h3', { text: 'Локация' }), fieldsEl];
         var nav = dom.el('div', { id: 'cwb-lu-nav' }, navChildren);
         var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавь поле или таблицу в настройках' });
         var trainBtn = dom.el('button', {
@@ -4487,306 +4062,6 @@
   });
 
   /* ====================================================================== */
-  /* src/modules/clock.js */
-  __def("modules/clock", function (require, module, exports) {
-    /**
-     * Часы.
-     *
-     * Отдельный плавающий виджет в нашем контейнере, а не врезка в игровую вёрстку:
-     * так он ни от чего в игре не зависит и снимается одним removeChild.
-     * Игровой час берём из Vue (`weather.hour`), он тикает внутри игры раз в секунду.
-     */
-
-    var dom = require('core/dom');
-
-    var SEASONS = ['Зима', 'Весна', 'Лето', 'Осень'];
-
-    function pad(n) {
-      return n < 10 ? '0' + n : String(n);
-    }
-
-    function realTime(s) {
-      var now = new Date();
-      var opts = {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      };
-      if (s.showSeconds) opts.second = '2-digit';
-      if (s.timezone === 'msk') opts.timeZone = 'Europe/Moscow';
-      try {
-        return new Intl.DateTimeFormat('ru-RU', opts).format(now);
-      } catch (e) {
-        return pad(now.getHours()) + ':' + pad(now.getMinutes()) + (s.showSeconds ? ':' + pad(now.getSeconds()) : '');
-      }
-    }
-
-    module.exports = {
-      id: 'clock',
-      title: 'Часы',
-      description: 'Плавающие часы. Реальное время, по желанию ещё игровой час и сезон.',
-      category: 'interface',
-      pages: ['game', 'hunt', 'chat', 'pm'],
-      enabledByDefault: false,
-      order: 10,
-
-      defaults: {
-        timezone: 'local',   // local | msk
-        showSeconds: false,
-        showGameHour: false,
-        showSeason: false,
-        fontSize: 15,
-        x: null,             // положение после перетаскивания, px от левого/верхнего края
-        y: null,
-      },
-
-      schema: [
-        {
-          key: 'timezone',
-          type: 'select',
-          label: 'Время',
-          options: [
-            { value: 'local', label: 'Местное' },
-            { value: 'msk', label: 'Московское' },
-          ],
-        },
-        { key: 'showSeconds', type: 'boolean', label: 'Показывать секунды' },
-        { key: 'showGameHour', type: 'boolean', label: 'Игровой час', hint: 'Только на игровой странице.' },
-        { key: 'showSeason', type: 'boolean', label: 'Игровой сезон' },
-        { key: 'fontSize', type: 'number', label: 'Размер шрифта, px', min: 9, max: 40, step: 1 },
-      ],
-
-      styles: function (s) {
-        return [
-          '#cwb-clock{position:fixed;z-index:2147482000;padding:4px 10px;border-radius:8px;',
-          'background:rgba(20,18,15,.72);color:#f3e7d3;font:', Math.max(9, Math.min(40, Number(s.fontSize) || 15)),
-          'px/1.35 ui-monospace,Menlo,Consolas,monospace;',
-          'white-space:nowrap;cursor:move;user-select:none;-webkit-user-select:none;box-shadow:0 2px 8px rgba(0,0,0,.35);}',
-          '#cwb-clock .cwb-clock-sub{opacity:.75;font-size:.82em;}',
-        ].join('');
-      },
-
-      init: function (ctx) {
-        var s = ctx.settings.all();
-
-        var main = dom.el('span', { class: 'cwb-clock-main' });
-        var sub = dom.el('span', { class: 'cwb-clock-sub' });
-        var node = dom.el('div', { id: 'cwb-clock', title: 'Можно перетащить' }, [main, sub]);
-
-        // Положение: сохранённое или по умолчанию сверху слева.
-        if (typeof s.x === 'number' && typeof s.y === 'number') {
-          node.style.left = s.x + 'px';
-          node.style.top = s.y + 'px';
-        } else {
-          node.style.left = '12px';
-          node.style.top = '12px';
-        }
-
-        ctx.mount(node);
-
-        function paint() {
-          var cur = ctx.settings.all();
-          main.textContent = realTime(cur);
-
-          var extras = [];
-          if (cur.showGameHour) {
-            var hour = ctx.vue.get('weather.hour');
-            if (typeof hour === 'number') extras.push('игр. ' + pad(hour) + ':00');
-          }
-          if (cur.showSeason) {
-            var season = ctx.vue.get('weather.season');
-            if (typeof season === 'number' && SEASONS[season]) extras.push(SEASONS[season]);
-          }
-          sub.textContent = extras.length ? ' · ' + extras.join(' · ') : '';
-        }
-
-        paint();
-        ctx.interval(paint, s.showSeconds ? 1000 : 15000);
-        // Отдельный «минутный» тик, чтобы без секунд часы не отставали больше 15 с.
-        if (!s.showSeconds) ctx.interval(paint, 1000 * 30);
-
-        if (s.showGameHour || s.showSeason) ctx.watch('weather.hour', paint);
-
-        /* --------------------------- перетаскивание ---------------------------- */
-
-        var drag = null;
-
-        ctx.on(node, 'pointerdown', function (e) {
-          if (e.button !== 0) return;
-          var rect = node.getBoundingClientRect();
-          drag = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
-          try { node.setPointerCapture(e.pointerId); } catch (err) { /* не критично */ }
-          e.preventDefault();
-        });
-
-        ctx.on(node, 'pointermove', function (e) {
-          if (!drag) return;
-          var x = Math.max(0, Math.min(window.innerWidth - node.offsetWidth, e.clientX - drag.dx));
-          var y = Math.max(0, Math.min(window.innerHeight - node.offsetHeight, e.clientY - drag.dy));
-          node.style.left = x + 'px';
-          node.style.top = y + 'px';
-        });
-
-        ctx.on(node, 'pointerup', function (e) {
-          if (!drag) return;
-          drag = null;
-          try { node.releasePointerCapture(e.pointerId); } catch (err) { /* не критично */ }
-          // Сохраняем через onSettings-безопасный путь: у модуля есть onSettings,
-          // поэтому перезапуска не произойдёт и виджет не «мигнёт».
-          ctx.settings.set('x', parseInt(node.style.left, 10) || 0);
-          ctx.settings.set('y', parseInt(node.style.top, 10) || 0);
-        });
-      },
-
-      /**
-       * Настройки применяются без полного перезапуска, кроме тех, что меняют
-       * частоту тика или набор подписок.
-       */
-      onSettings: function (ctx, key) {
-        if (key === 'x' || key === 'y') return; // положение уже применено мышью
-        ctx.log.debug('перезапуск часов из-за настройки', key);
-        var registry = require('core/registry');
-        registry.stopModule('clock');
-        registry.startModule('clock');
-      },
-    };
-  });
-
-  /* ====================================================================== */
-  /* src/modules/copy-id.js */
-  __def("modules/copy-id", function (require, module, exports) {
-    /**
-     * Копирование ID кота или предмета.
-     *
-     * Важно: клик по иконке предмета/кота во рту открывает игровое меню (#thdey).
-     * Перехватывать его нельзя — именно так ломалось меню. Копируем только
-     * со строки «Уникальный ID» и с наших подписей, либо с ссылки /catN без
-     * блокировки перехода.
-     */
-
-    var dom = require('core/dom');
-
-    var TOAST_ID = 'cwb-copy-toast';
-
-    function copyText(text) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(String(text));
-      }
-      return new Promise(function (resolve, reject) {
-        try {
-          var ta = document.createElement('textarea');
-          ta.value = String(text);
-          ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-          resolve();
-        } catch (e) { reject(e); }
-      });
-    }
-
-    function parseId(text) {
-      var m = /(\d{3,})/.exec(String(text || ''));
-      return m ? m[1] : null;
-    }
-
-    module.exports = {
-      id: 'copy-id',
-      title: 'Копирование ID',
-      description: 'Клик по строке «Уникальный ID» в меню предмета или по подписи ID копирует число. По иконке предмета меню не ломается.',
-      category: 'info',
-      pages: ['game', 'pm', 'profile'],
-      enabledByDefault: false,
-      order: 44,
-
-      defaults: {
-        requireAlt: false,
-      },
-
-      schema: [
-        {
-          key: 'requireAlt',
-          type: 'boolean',
-          label: 'Только с зажатым Alt',
-          hint: 'Без галочки копируется обычным кликом по строке ID, не по иконке.',
-        },
-      ],
-
-      styles: function () {
-        return [
-          '#' + TOAST_ID + '{position:fixed;z-index:2147483000;bottom:24px;left:50%;transform:translateX(-50%);',
-          'padding:6px 14px;border-radius:8px;background:rgba(20,18,15,.9);color:#f3e7d3;',
-          'font:13px/1.3 ui-monospace,Menlo,Consolas,monospace;pointer-events:none;',
-          'box-shadow:0 2px 10px rgba(0,0,0,.35);transition:opacity .2s;}',
-        ].join('');
-      },
-
-      init: function (ctx) {
-        var toastTimer = null;
-
-        function flash(msg) {
-          var node = document.getElementById(TOAST_ID);
-          if (!node) {
-            node = dom.el('div', { id: TOAST_ID });
-            ctx.mount(node);
-          }
-          node.textContent = msg;
-          node.style.opacity = '1';
-          clearTimeout(toastTimer);
-          toastTimer = ctx.timeout(function () { node.style.opacity = '0'; }, 1400);
-        }
-
-        function copyId(id) {
-          if (!id || !/^\d+$/.test(String(id))) return false;
-          copyText(id).then(function () {
-            flash('Скопировано: ' + id);
-          }).catch(function () {
-            flash('Не удалось скопировать');
-          });
-          return true;
-        }
-
-        function onClick(e) {
-          if (ctx.settings.get('requireAlt') && !e.altKey) return;
-
-          // Иконка предмета/кота и чекбокс выбора — игровое меню. Не трогаем.
-          if (e.target.closest && e.target.closest('#itemList .itemInMouth, #itemList .catrot, #itemList .item-select, #thdey a, #ctdey a')) {
-            return;
-          }
-
-          // Строка «Уникальный ID: 72517354» в меню предмета
-          var thLi = e.target.closest && e.target.closest('#thdey li');
-          if (thLi && /Уникальный ID/i.test(thLi.textContent || '')) {
-            var id = parseId(thLi.textContent);
-            if (!id) {
-              var list = ctx.vue.get('item.list');
-              if (Array.isArray(list)) {
-                list.forEach(function (it) { if (it && it.isActive) id = String(it.id); });
-              }
-            }
-            if (copyId(id)) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-            return;
-          }
-
-          // Ссылка на профиль: копируем, но переход не блокируем
-          var a = e.target.closest && e.target.closest('a[href*="cat"]');
-          if (a && !(a.closest && a.closest('#thdey, #ctdey, #itemList'))) {
-            var href = a.getAttribute('href') || '';
-            var match = /(?:^|\/)cat(\d+)/.exec(href);
-            if (match) copyId(match[1]);
-          }
-        }
-
-        ctx.on(document, 'click', onClick, true);
-      },
-    };
-  });
-
-  /* ====================================================================== */
   /* src/modules/domain-redirect-reverse.js */
   __def("modules/domain-redirect-reverse", function (require, module, exports) {
     /**
@@ -5049,9 +4324,6 @@
       return mod;
     }
 
-    var IS_LU = false;
-    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
-
     var mod = createRedirectModule({
       id: 'domain-redirect',
       title: 'Редирект catwar.net → .su',
@@ -5073,26 +4345,7 @@
         interceptNetwork: true,
       },
 
-      schema: IS_LU ? [] : [
-        {
-          key: 'redirectPage',
-          type: 'boolean',
-          label: 'Перенаправлять открытие catwar.net',
-          hint: 'Если вкладка открылась на catwar.net — кинет на тот же путь на .su.',
-        },
-        {
-          key: 'rewriteDom',
-          type: 'boolean',
-          label: 'Подменять .net в ссылках и картинках',
-          hint: 'Ссылки, картинки, клики и window.open.',
-        },
-        {
-          key: 'interceptNetwork',
-          type: 'boolean',
-          label: 'Подменять .net в fetch и XHR',
-          hint: 'Свои запросы не шлёт, только правит адрес у тех, что уже идут.',
-        },
-      ],
+      schema: [],
     });
 
     /* Если работает обратный редирект (su → .net), а включили нас (net → .su) —
@@ -5115,124 +4368,8 @@
   });
 
   /* ====================================================================== */
-  /* src/modules/grid.js */
-  __def("modules/grid", function (require, module, exports) {
-    /**
-     * Сетка на игровом поле.
-     *
-     * Поле — таблица #cages 10×6, клетка — td.cage (класс жив, в бандле есть
-     * правило `.cage{padding-bottom:16px}`). Рисуем внутреннюю рамку через
-     * box-shadow inset: он не меняет размеры клетки и не ломает раскладку,
-     * в отличие от border.
-     */
-
-    var dom = require('core/dom');
-
-    module.exports = {
-      id: 'grid',
-      title: 'Сетка на поле',
-      description: 'Рисует границы клеток на поле.',
-      category: 'field',
-      pages: ['game', 'hunt'],
-      enabledByDefault: false,
-      order: 20,
-
-      defaults: {
-        color: '#ffffff',
-        opacity: 0.35,
-        width: 1,
-        skipSmell: true,
-      },
-
-      schema: [
-        { key: 'color', type: 'color', label: 'Цвет линий' },
-        { key: 'opacity', type: 'range', label: 'Непрозрачность', min: 0.05, max: 1, step: 0.05 },
-        { key: 'width', type: 'number', label: 'Толщина, px', min: 1, max: 6, step: 1 },
-        {
-          key: 'skipSmell',
-          type: 'boolean',
-          label: 'Не рисовать в режиме нюха',
-          hint: 'В режиме нюха у поля своя разметка, сетка поверх неё мешает.',
-        },
-      ],
-
-      styles: function (s) {
-        var uwu = require('core/uwu');
-        if (uwu.hasCellBorders()) return '';
-        var color = dom.hexToRgba(s.color, s.opacity);
-        var w = Math.max(1, Math.min(6, Number(s.width) || 1));
-        return '#cages td.cage { box-shadow: inset 0 0 0 ' + w + 'px ' + color + '; }';
-      },
-
-      init: function (ctx) {
-        if (!ctx.settings.get('skipSmell')) return;
-
-        // В режиме нюха таблица та же (#cages, td.cage), отличительного класса на
-        // ней НЕТ — проверено по сохранённому HTML. Единственный надёжный признак —
-        // field.smellMap в стейте, поэтому гасим сетку из JS, а не селектором.
-        function sync() {
-          var smell = ctx.vue.get('field.smellMap');
-          var active = !!smell && (!Array.isArray(smell) || smell.length > 0);
-          if (active) ctx.removeStyle();
-          else ctx.refreshStyles();
-        }
-
-        return ctx.whenVueReady().then(function (vm) {
-          if (!vm || ctx.isDisposed()) return;
-          sync();
-          ctx.watch('field.smellMap', sync);
-        });
-      },
-
-      // Меняем настройки без перезапуска: styles() реестр уже пересобрал.
-      onSettings: function (ctx, key) {
-        if (key === 'skipSmell') {
-          // Смена этой опции меняет набор подписок — нужен честный перезапуск.
-          var registry = require('core/registry');
-          registry.stopModule('grid');
-          registry.startModule('grid');
-        }
-      },
-    };
-  });
-
-  /* ====================================================================== */
-  /* src/modules/hide-cat-tooltip.js */
-  __def("modules/hide-cat-tooltip", function (require, module, exports) {
-    /**
-     * Скрыть всплывающее окно «О коте».
-     *
-     * Как в CatWar UwU (`hideCatTooltip` в быстрых стилях игровой):
-     *   .cat_tooltip { display: none !important; }
-     *
-     * `.cat_tooltip` — <span> внутри `.cat` на клетке поля: имя, титул, запах,
-     * онлайн. Тот же класс есть и в нюхе. DOM не трогаем — только CSS, клик
-     * по коту и ссылка /catN остаются в разметке.
-     */
-
-    module.exports = {
-      id: 'hide-cat-tooltip',
-      title: 'Скрыть окно «О коте»',
-      description: 'Не показывает всплывашку с именем и запахом при наведении на кота.',
-      category: 'interface',
-      pages: ['game'],
-      enabledByDefault: false,
-      order: 45,
-
-      styles: function () {
-        var uwu = require('core/uwu');
-        if (uwu.hidingCatTooltip()) return '';
-        return '.cat_tooltip { display: none !important; }';
-      },
-    };
-  });
-
-  /* ====================================================================== */
   /* src/modules/hide-weather.js */
   __def("modules/hide-weather", function (require, module, exports) {
-    var IS_LU = false;
-    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
-
     /**
      * Скрыть погоду.
      *
@@ -5257,7 +4394,7 @@
       pages: ['game'],
       enabledByDefault: false,
       order: 40,
-      warning: IS_LU ? null : '«Вся строка погоды» прячет ещё и «Моё местонахождение» — оно в той же строке.',
+      warning: null,
 
       defaults: {
         sky: true,
@@ -5267,21 +4404,10 @@
         wholeRow: false,
       },
 
-      schema: IS_LU ? [
+      schema: [
         { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
         { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
         { key: 'season', type: 'boolean', label: 'Иконка сезона' },
-      ] : [
-        { key: 'sky', type: 'boolean', label: 'Небо над полем' },
-        { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
-        { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
-        { key: 'season', type: 'boolean', label: 'Иконка сезона' },
-        {
-          key: 'wholeRow',
-          type: 'boolean',
-          label: 'Вся строка погоды',
-          hint: 'Перебивает галочки выше. В компакте ещё спрячет название локации.',
-        },
       ],
 
       styles: function (s) {
@@ -5305,56 +4431,6 @@
   });
 
   /* ====================================================================== */
-  /* src/modules/highlight-moves.js */
-  __def("modules/highlight-moves", function (require, module, exports) {
-    /**
-     * Подсветка переходов между локациями.
-     *
-     * Переход на поле — `.move_parent` (внутри img.move_img + .move_name,
-     * классы .owned / .not_owned). Работаем только фильтром на ховере,
-     * DOM не трогаем: клик по переходу должен остаться родным (игра шлёт
-     * dynamicToken, подменять или эмулировать этот клик нельзя).
-     */
-
-    var dom = require('core/dom');
-
-    module.exports = {
-      id: 'highlight-moves',
-      title: 'Подсветка переходов',
-      description: 'Свечение вокруг перехода при наведении курсора.',
-      category: 'field',
-      pages: ['game'],
-      enabledByDefault: false,
-      order: 50,
-
-      defaults: {
-        color: '#ffffff',
-        opacity: 0.8,
-        blur: 6,
-        always: false,
-      },
-
-      schema: [
-        { key: 'color', type: 'color', label: 'Цвет свечения' },
-        { key: 'opacity', type: 'range', label: 'Непрозрачность', min: 0.1, max: 1, step: 0.05 },
-        { key: 'blur', type: 'number', label: 'Размытие, px', min: 1, max: 24, step: 1 },
-        { key: 'always', type: 'boolean', label: 'Подсвечивать постоянно, а не по наведению' },
-      ],
-
-      styles: function (s) {
-        var color = dom.hexToRgba(s.color, s.opacity);
-        var blur = Math.max(1, Math.min(24, Number(s.blur) || 6));
-        var glow = 'drop-shadow(0 0 ' + blur + 'px ' + color + ')';
-        var css = ['.move_parent { transition: filter .25s ease; }'];
-        css.push(s.always
-          ? '.move_parent { filter: ' + glow + '; }'
-          : '.move_parent:hover { filter: ' + glow + '; }');
-        return css.join('\n');
-      },
-    };
-  });
-
-  /* ====================================================================== */
   /* src/modules/history-autoscroll.js */
   __def("modules/history-autoscroll", function (require, module, exports) {
     /**
@@ -5368,9 +4444,6 @@
      * ловим это MutationObserver-ом на контейнере (childList + characterData),
      * дублируя более надёжным $watch по стейту, если Vue доступен.
      */
-
-    var IS_LU = false;
-    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
 
     var dom = require('core/dom');
 
@@ -5389,16 +4462,7 @@
         smooth: false,
       },
 
-      schema: IS_LU ? [] : [
-        {
-          key: 'respectUserScroll',
-          type: 'boolean',
-          label: 'Не мешать, если прокрутил вверх',
-          hint: 'Автопрокрутка вернётся, как только снова окажешься внизу.',
-        },
-        { key: 'threshold', type: 'number', label: 'Зона «у низа», px', min: 0, max: 600, step: 10 },
-        { key: 'smooth', type: 'boolean', label: 'Плавная прокрутка' },
-      ],
+      schema: [],
 
       init: function (ctx) {
         var target = null;   // прокручиваемый контейнер
@@ -5469,137 +4533,6 @@
   });
 
   /* ====================================================================== */
-  /* src/modules/hunt-smell-square.js */
-  __def("modules/hunt-smell-square", function (require, module, exports) {
-    /**
-     * Подсказки по квадрату запаха на странице охоты (/cw3/jagd).
-     *
-     * Перенос фичи CW Shed / CatWar UwU: элемент #smell меняет красный канал
-     * background-color — чем больше, тем ближе дичь. Показываем «Ближе» / «Дальше» /
-     * «Потерян» (red=0) и таймер с начала отслеживания.
-     *
-     * Наблюдаем только style у #smell, DOM не перестраиваем.
-     */
-
-    var SMELL = '#smell';
-    var HINT_ID = 'cwb-smell-hint';
-    var TIMER_ID = 'cwb-smell-timer';
-
-    function parseRed(color) {
-      if (!color || color === 'transparent' || color === 'rgba(0, 0, 0, 0)') return null;
-      var m = /rgba?\(\s*(\d+)/.exec(color);
-      return m ? parseInt(m[1], 10) : null;
-    }
-
-    module.exports = {
-      id: 'hunt-smell-square',
-      title: 'Подсказка по запаху (охота)',
-      description: 'На охоте пишет «Ближе», «Дальше» или «Потерян» по цвету квадрата запаха. Ещё таймер.',
-      category: 'info',
-      pages: ['hunt'],
-      enabledByDefault: false,
-      order: 50,
-
-      defaults: {
-        showTimer: true,
-      },
-
-      schema: [
-        { key: 'showTimer', type: 'boolean', label: 'Показывать таймер' },
-      ],
-
-      styles: function () {
-        return [
-          '#' + HINT_ID + ', #' + TIMER_ID + '{',
-          'font: 16px/1.2 ui-monospace, Menlo, Consolas, monospace;',
-          'background: rgba(255,255,255,.92); color: #111; text-align: center;',
-          'padding: 4px 6px; border-radius: 4px; pointer-events: none;',
-          'box-shadow: 0 1px 4px rgba(0,0,0,.25);',
-          '}',
-          '#' + HINT_ID + '{ position: fixed; z-index: 2147481000; min-width: 100px; }',
-          '#' + TIMER_ID + '{ position: fixed; z-index: 2147481000; min-width: 100px; font-size: 14px; }',
-        ].join('\n');
-      },
-
-      init: function (ctx) {
-        if (require('core/uwu').hasHuntSmell()) {
-          ctx.log.info('UwU уже описывает запах на охоте — нашу подсказку не вешаем');
-          return;
-        }
-        var hint = null;
-        var timerEl = null;
-        var prevRed = null;
-        var seconds = 0;
-        var tick = null;
-        var smellEl = null;
-
-        function positionNearSmell() {
-          if (!smellEl || !hint) return;
-          var r = smellEl.getBoundingClientRect();
-          hint.style.left = Math.max(8, r.left) + 'px';
-          hint.style.top = Math.max(8, r.top - 28) + 'px';
-          if (timerEl) {
-            timerEl.style.left = hint.style.left;
-            timerEl.style.top = (parseInt(hint.style.top, 10) + 24) + 'px';
-          }
-        }
-
-        function setHint(text) {
-          if (!hint) {
-            hint = ctx.dom.el('div', { id: HINT_ID });
-            ctx.mount(hint);
-          }
-          hint.textContent = text;
-          positionNearSmell();
-        }
-
-        function ensureTimer() {
-          if (!ctx.settings.get('showTimer')) return;
-          if (!timerEl) {
-            timerEl = ctx.dom.el('div', { id: TIMER_ID, text: '00:00' });
-            ctx.mount(timerEl);
-            tick = ctx.interval(function () {
-              seconds += 1;
-              var m = Math.floor(seconds / 60);
-              var s = seconds % 60;
-              timerEl.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
-              positionNearSmell();
-            }, 1000);
-          }
-        }
-
-        function onSmellStyle() {
-          if (!smellEl || ctx.isDisposed()) return;
-          var red = parseRed(window.getComputedStyle(smellEl).backgroundColor);
-          if (red === null) return;
-
-          ensureTimer();
-
-          if (red === 0) {
-            setHint('Потерян');
-          } else if (prevRed !== null) {
-            if (red > prevRed) setHint('Ближе');
-            else if (red < prevRed) setHint('Дальше');
-          } else {
-            setHint(' ');
-          }
-          prevRed = red;
-          positionNearSmell();
-        }
-
-        return ctx.dom.waitForElement(SMELL).then(function (el) {
-          if (!el || ctx.isDisposed()) return;
-          smellEl = el;
-          ctx.observe(el, onSmellStyle, { attributes: true, attributeFilter: ['style'] });
-          ctx.on(window, 'resize', positionNearSmell);
-          ctx.on(window, 'scroll', positionNearSmell, true);
-          onSmellStyle();
-        });
-      },
-    };
-  });
-
-  /* ====================================================================== */
   /* src/modules/layout-swap.js */
   __def("modules/layout-swap", function (require, module, exports) {
     /**
@@ -5663,169 +4596,6 @@
   });
 
   /* ====================================================================== */
-  /* src/modules/mouth-cat-ids.js */
-  __def("modules/mouth-cat-ids", function (require, module, exports) {
-    /**
-     * ID котов во рту.
-     *
-     * Данные — vm.cat.taken[].id; в DOM у div.catrot атрибут id совпадает с ID кота.
-     * Подписи через data-cwb-id + CSS ::after, чтобы не трогать class/style Vue.
-     * См. RUNTIME.md §8.7.
-     */
-
-    var SEL_ITEM_LIST = '#itemList';
-    var SEL_CATROT = SEL_ITEM_LIST + ' .catrot';
-
-    module.exports = {
-      id: 'mouth-cat-ids',
-      title: 'ID котов во рту',
-      description: 'Числовой ID каждого кота, которого держишь во рту.',
-      category: 'info',
-      pages: ['game'],
-      enabledByDefault: false,
-      order: 40,
-
-      defaults: {
-        fontSize: 10,
-      },
-
-      schema: [
-        { key: 'fontSize', type: 'number', label: 'Размер подписи, px', min: 8, max: 14, step: 1 },
-      ],
-
-      styles: function (s) {
-        var fs = Math.max(8, Math.min(14, Number(s.fontSize) || 10));
-        return [
-          SEL_CATROT + ' { position: relative; }',
-          SEL_CATROT + '[data-cwb-id]::after {',
-          'content: attr(data-cwb-id); position: absolute; left: 0; bottom: 0;',
-          'font: ' + fs + 'px/1 ui-monospace, Menlo, Consolas, monospace;',
-          'background: rgba(0,0,0,.72); color: #fff; padding: 1px 3px;',
-          'pointer-events: none; z-index: 2; border-radius: 2px;',
-          '}',
-        ].join('\n');
-      },
-
-      init: function (ctx) {
-        function mark() {
-          var taken = ctx.vue.get('cat.taken');
-          if (!Array.isArray(taken)) return;
-          taken.forEach(function (cat) {
-            if (!cat || cat.id == null) return;
-            var el = document.getElementById(String(cat.id));
-            if (el && el.classList.contains('catrot')) el.dataset.cwbId = String(cat.id);
-          });
-          ctx.dom.qsa(SEL_CATROT).forEach(function (el) {
-            if (!el.dataset.cwbId) delete el.dataset.cwbId;
-          });
-        }
-
-        return ctx.whenVueReady().then(function (vm) {
-          if (!vm || ctx.isDisposed()) return;
-          mark();
-          ctx.watch('cat.taken', function () {
-            if (ctx.isDisposed()) return;
-            requestAnimationFrame(mark);
-          }, { deep: true });
-        });
-      },
-    };
-  });
-
-  /* ====================================================================== */
-  /* src/modules/mouth-item-ids.js */
-  __def("modules/mouth-item-ids", function (require, module, exports) {
-    /**
-     * ID и названия предметов во рту.
-     *
-     * Уникальный id и type — из item.list; название восстанавливаем из eatText
-     * (единственный клиентский источник без модалки обмена). См. RUNTIME.md §8.8.
-     */
-
-    var SEL_ITEM = '#itemList .itemInMouth';
-
-    /** Убирает глагол из eatText («Съесть голубой коралл» → «голубой коралл»). */
-    function itemNameFromEatText(eatText, type) {
-      var name = String(eatText || '')
-        .replace(/^(Съесть|Выпить|Обнять|Понюхать|Использовать|Развернуть)\s+/i, '')
-        .trim();
-      return name || ('тип ' + type);
-    }
-
-    module.exports = {
-      id: 'mouth-item-ids',
-      title: 'ID предметов во рту',
-      description: 'Подписи с уникальным ID, типом и названием предмета во рту.',
-      category: 'info',
-      pages: ['game'],
-      enabledByDefault: false,
-      order: 41,
-
-      defaults: {
-        showName: true,
-        fontSize: 9,
-      },
-
-      schema: [
-        { key: 'showName', type: 'boolean', label: 'Показывать название' },
-        { key: 'fontSize', type: 'number', label: 'Размер подписи, px', min: 7, max: 12, step: 1 },
-      ],
-
-      styles: function (s) {
-        var fs = Math.max(7, Math.min(12, Number(s.fontSize) || 9));
-        return [
-          SEL_ITEM + ' { position: relative; }',
-          SEL_ITEM + '[data-cwb-label]::after {',
-          'content: attr(data-cwb-label); position: absolute; left: 0; bottom: 0; right: 0;',
-          'font: ' + fs + 'px/1.15 ui-monospace, Menlo, Consolas, monospace;',
-          'background: rgba(0,0,0,.72); color: #fff; padding: 1px 3px;',
-          'pointer-events: none; z-index: 2; white-space: pre-wrap; word-break: break-all;',
-          '}',
-        ].join('\n');
-      },
-
-      init: function (ctx) {
-        function mark() {
-          var list = ctx.vue.get('item.list');
-          if (!Array.isArray(list)) return;
-          var showName = ctx.settings.get('showName');
-          list.forEach(function (item) {
-            if (!item || item.id == null) return;
-            var el = document.getElementById(String(item.id));
-            if (!el || !el.classList.contains('itemInMouth')) return;
-            var name = itemNameFromEatText(item.eatText, item.type);
-            var label = String(item.id) + '\\A#' + item.type;
-            if (showName) label += '\\A' + name;
-            el.dataset.cwbLabel = label;
-          });
-          ctx.dom.qsa(SEL_ITEM).forEach(function (el) {
-            var id = el.id;
-            var found = list && list.some(function (i) { return String(i.id) === id; });
-            if (!found) delete el.dataset.cwbLabel;
-          });
-        }
-
-        return ctx.whenVueReady().then(function (vm) {
-          if (!vm || ctx.isDisposed()) return;
-          mark();
-          ctx.watch('item.list', function () {
-            if (ctx.isDisposed()) return;
-            requestAnimationFrame(mark);
-          }, { deep: true });
-        });
-      },
-
-      onSettings: function (ctx, key) {
-        if (key === 'showName') {
-          var registry = require('core/registry');
-          registry.stopModule('mouth-item-ids');
-          registry.startModule('mouth-item-ids');
-        }
-      },
-    };
-  });
-
-  /* ====================================================================== */
   /* src/modules/notifications.js */
   __def("modules/notifications", function (require, module, exports) {
     /**
@@ -5838,8 +4608,6 @@
 
     var audio = require('core/audio');
     var dom = require('core/dom');
-
-    var IS_LU = require('cwb:meta').variant === 'lu';
 
     var PERM_BTN = 'cwb-notify-perm';
 
@@ -5860,91 +4628,53 @@
         volume: 0.4,
       },
 
-      schema: IS_LU
-        ? [
-            { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
-            { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
-            { key: 'volume', type: 'range', label: 'Громкость звука', min: 0, max: 1, step: 0.05 },
-            {
-              key: '_testSound',
-              type: 'custom',
-              label: 'Проверить звук',
-              render: function () {
-                return dom.el('button', {
-                  type: 'button',
-                  class: 'cwb-btn',
-                  text: 'Проверить звук',
-                  onclick: function () {
-                    var registry = require('core/registry');
-                    audio.play('pm', registry.settingsOf('notifications').volume);
-                  },
-                });
+      schema: [
+        { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
+        { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
+        { key: 'volume', type: 'range', label: 'Громкость звука', min: 0, max: 1, step: 0.05 },
+        {
+          key: '_testSound',
+          type: 'custom',
+          label: 'Проверить звук',
+          render: function () {
+            return dom.el('button', {
+              type: 'button',
+              class: 'cwb-btn',
+              text: 'Проверить звук',
+              onclick: function () {
+                var registry = require('core/registry');
+                audio.play('pm', registry.settingsOf('notifications').volume);
               },
-            },
-            {
-              key: '_perm',
-              type: 'boolean',
-              label: 'Запросить разрешение браузера',
-              hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
-            },
-          ]
-        : [
-            { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
-            { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
-            { key: 'sound', type: 'boolean', label: 'Звук при уведомлении' },
-            { key: 'blinkTitle', type: 'boolean', label: 'Мигать заголовком вкладки' },
-            { key: 'volume', type: 'range', label: 'Громкость звука', min: 0.05, max: 1, step: 0.05 },
-            {
-              key: '_perm',
-              type: 'boolean',
-              label: 'Запросить разрешение браузера',
-              hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
-            },
-          ],
+            });
+          },
+        },
+        {
+          key: '_perm',
+          type: 'custom',
+          label: 'Запросить разрешение',
+          render: function () {
+            return dom.el('button', {
+              type: 'button',
+              class: 'cwb-btn',
+              text: 'Запросить разрешение',
+              onclick: function () {
+                if (typeof Notification !== 'undefined') {
+                  Notification.requestPermission();
+                }
+              },
+            });
+          },
+        },
+      ],
 
       init: function (ctx) {
-        var origTitle = document.title;
-        var blinkTimer = null;
-        var blinkOn = false;
-
-        function stopBlink() {
-          clearInterval(blinkTimer);
-          blinkTimer = null;
-          document.title = origTitle;
-          blinkOn = false;
-        }
-
-        function blink(title) {
-          if (!ctx.settings.get('blinkTitle')) return;
-          stopBlink();
-          var alt = '● ' + title;
-          blinkTimer = ctx.interval(function () {
-            document.title = blinkOn ? origTitle : alt;
-            blinkOn = !blinkOn;
-          }, 900);
-          ctx.on(window, 'focus', stopBlink);
-        }
-
         function notify(title, body, kind) {
-          if (IS_LU) {
-            audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
-          } else {
-            if (ctx.settings.get('sound')) audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
-            blink(title);
-          }
+          audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
           if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
           try {
             var n = new Notification(title, { body: body, tag: 'cwb-' + kind });
             n.onclick = function () { window.focus(); n.close(); };
           } catch (e) { ctx.log.warn('Notification API', e); }
-        }
-
-        // Кнопка разрешения — через одноразовый обработчик настройки _perm
-        if (ctx.settings.get('_perm') && typeof Notification !== 'undefined' &&
-            Notification.permission === 'default') {
-          Notification.requestPermission().finally(function () {
-            ctx.settings.set('_perm', false);
-          });
         }
 
         return ctx.whenVueReady().then(function (vm) {
@@ -5975,18 +4705,9 @@
       },
 
       destroy: function () {
-        if (typeof document !== 'undefined') document.title = document.title.replace(/^●\s*/, '');
       },
 
       onSettings: function (ctx, key) {
-        if (key === '_perm') {
-          if (ctx.settings.get('_perm') && typeof Notification !== 'undefined') {
-            Notification.requestPermission().finally(function () {
-              ctx.settings.set('_perm', false);
-            });
-          }
-          return;
-        }
         var registry = require('core/registry');
         registry.stopModule('notifications');
         registry.startModule('notifications');
@@ -6013,9 +4734,6 @@
      *   base    — свой базовый URL: {base}/{id}.png для всех известных id;
      *   custom  — свой JSON {"1": "https://…", "exchange": "https://…"}.
      */
-
-    var IS_LU = false;
-    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
 
     var data = require('data/old-icons');
     var dom = require('core/dom');
@@ -6053,7 +4771,7 @@
       pages: ['game'],
       enabledByDefault: false,
       order: 20,
-      warning: IS_LU ? 'Иконки грузятся со стороннего хоста d.zaix.ru.' : 'Встроенный список неполный (' + data.count + ' иконок) и тянет картинки с d.zaix.ru. Лучше свой URL или свой словарь.',
+      warning: 'Иконки грузятся со стороннего хоста d.zaix.ru.',
 
       defaults: {
         source: 'builtin',     // builtin | base | custom
@@ -6062,26 +4780,7 @@
         includeExtra: true,
       },
 
-      schema: IS_LU ? [] : [
-        {
-          key: 'source',
-          type: 'select',
-          label: 'Откуда брать картинки',
-          options: [
-            { value: 'builtin', label: 'Встроенный словарь (из CW Shed)' },
-            { value: 'base', label: 'Свой базовый URL: {base}/{id}.png' },
-            { value: 'custom', label: 'Свой словарь JSON' },
-          ],
-        },
-        { key: 'baseUrl', type: 'text', label: 'Базовый URL', placeholder: 'https://example.com/cw-old-icons' },
-        {
-          key: 'customMap',
-          type: 'textarea',
-          label: 'Свой словарь',
-          placeholder: '{\n  "1": "https://…/1.png",\n  "exchange": "https://…/exchange.png"\n}',
-        },
-        { key: 'includeExtra', type: 'boolean', label: 'Менять ещё и иконку диалога' },
-      ],
+      schema: [],
 
       styles: function (s) {
         var map = buildMap(s);
@@ -6114,151 +4813,6 @@
 
       onSettings: function (ctx) {
         // styles() уже пересобран реестром; своей логики на изменении нет.
-      },
-    };
-  });
-
-  /* ====================================================================== */
-  /* src/modules/param-info.js */
-  __def("modules/param-info", function (require, module, exports) {
-    /**
-     * Подробная информация о параметре или навыке по клику.
-     *
-     * Значения берём из parameter.data.*, не из ширины .bar-fill (там scaleX).
-     * Абсолютный опыт навыка — по шкале parameter.level и tooltip. См. CORRECTIONS.md.
-     */
-
-    var dom = require('core/dom');
-
-    var BLOCK_SEL = '#parameters_skills_block';
-    var CARD_ID = 'cwb-param-info';
-
-    function skillAbs(parameter, key) {
-      var d = parameter.data && parameter.data[key];
-      if (!d || d.level === undefined) return null;
-      var levels = parameter.level || [0, 1, 5, 20, 50, 200, 500, 1000, 3000, 10000];
-      var m = /\((\d+(?:[.,]\d+)?)\/(\d+|∞)\)\s*$/.exec(d.tooltip || '');
-      var inLvl = m ? parseFloat(String(m[1]).replace(',', '.')) : 0;
-      var span = m ? m[2] : '∞';
-      var abs = levels[d.level] + inLvl;
-      var next = levels[d.level + 1];
-      return {
-        level: d.level,
-        inLvl: inLvl,
-        span: span,
-        abs: abs,
-        next: next,
-        toNext: next != null ? next - abs : null,
-        barWidth: d.barWidth,
-        tooltip: d.tooltip,
-      };
-    }
-
-    function needAbs(cat, parameter, key) {
-      var map = { hunger: 'gol', thirst: 'zhazhda', dream: 'son', need: 'nuzh' };
-      var raw = map[key];
-      var max = parameter.maximums && parameter.maximums[key];
-      if (raw && cat && typeof cat[raw] === 'number' && typeof max === 'number') {
-        return { abs: cat[raw], max: max };
-      }
-      return null;
-    }
-
-    module.exports = {
-      id: 'param-info',
-      title: 'Карточка параметра',
-      description: 'По клику: текущее значение, максимум, уровень и полный опыт навыка.',
-      category: 'info',
-      pages: ['game'],
-      enabledByDefault: false,
-      order: 43,
-
-      styles: function () {
-        return [
-          '#' + CARD_ID + '{position:fixed;z-index:2147482500;max-width:320px;padding:10px 12px;',
-          'border-radius:8px;background:rgba(20,18,15,.92);color:#f3e7d3;',
-          'font:13px/1.45 sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.45);cursor:default;}',
-          '#' + CARD_ID + ' h4{margin:0 0 6px;font-size:14px;}',
-          '#' + CARD_ID + ' .cwb-param-row{opacity:.85;margin:2px 0;}',
-          '#' + CARD_ID + ' .cwb-param-close{float:right;cursor:pointer;opacity:.7;border:none;background:none;color:inherit;font-size:16px;}',
-        ].join('');
-      },
-
-      init: function (ctx) {
-        var card = null;
-
-        function hideCard() {
-          if (card && card.parentNode) card.parentNode.removeChild(card);
-          card = null;
-        }
-
-        function showCard(html, x, y) {
-          if (!card) {
-            card = dom.el('div', { id: CARD_ID });
-            ctx.mount(card);
-          }
-          card.innerHTML = html;
-          var left = Math.min(window.innerWidth - card.offsetWidth - 8, Math.max(8, x));
-          var top = Math.min(window.innerHeight - card.offsetHeight - 8, Math.max(8, y));
-          card.style.left = left + 'px';
-          card.style.top = top + 'px';
-          var closeBtn = card.querySelector('.cwb-param-close');
-          if (closeBtn) closeBtn.addEventListener('click', hideCard);
-          ctx.addCleanup(hideCard);
-        }
-
-        function onClick(e) {
-          var box = e.target.closest && e.target.closest('.parameter, .skill');
-          if (!box || !box.id) return;
-          // Не перехватываем клики по .symbole у health/smell — там игровые emit.
-          if (e.target.closest && e.target.closest('.symbole') &&
-              (box.id === 'health' || box.id === 'smell')) return;
-
-          var state = ctx.vue.getState();
-          if (!state || !state.parameter) return;
-
-          var key = box.id;
-          var parameter = state.parameter;
-          var d = parameter.data && parameter.data[key];
-          if (!d) return;
-
-          var title = (parameter.titles && parameter.titles[key]) || key;
-          var rows = [];
-
-          if (box.classList.contains('skill')) {
-            var s = skillAbs(parameter, key);
-            if (!s) return;
-            rows.push('<div class="cwb-param-row">Уровень: <b>' + s.level + '</b></div>');
-            rows.push('<div class="cwb-param-row">Прогресс: <b>' + s.inLvl + ' / ' + s.span + '</b> (' + (s.barWidth != null ? s.barWidth : '?') + '%)</div>');
-            rows.push('<div class="cwb-param-row">Весь опыт: <b>' + s.abs + '</b></div>');
-            if (s.toNext != null) rows.push('<div class="cwb-param-row">До след. уровня: <b>' + Math.max(0, Math.round(s.toNext * 100) / 100) + '</b></div>');
-            if (d.tooltip) rows.push('<div class="cwb-param-row">Подсказка: ' + dom.escapeHtml(d.tooltip) + '</div>');
-          } else {
-            rows.push('<div class="cwb-param-row">Текущее: <b>' + dom.escapeHtml(String(d.data || '')) + '</b></div>');
-            var na = needAbs(state.cat, parameter, key);
-            if (na) rows.push('<div class="cwb-param-row">Очки: <b>' + na.abs + ' / ' + na.max + '</b></div>');
-            var tipEl = box.querySelector('.symbole[data-original-title], .bar[data-original-title]');
-            var tip = tipEl && tipEl.getAttribute('data-original-title');
-            if (tip && tip !== 'null') rows.push('<div class="cwb-param-row">Подсказка: ' + dom.escapeHtml(tip) + '</div>');
-          }
-
-          e.preventDefault();
-          e.stopPropagation();
-          showCard(
-            '<button type="button" class="cwb-param-close" aria-label="Закрыть">×</button>' +
-            '<h4>' + dom.escapeHtml(title) + '</h4>' + rows.join(''),
-            e.clientX + 8,
-            e.clientY + 8
-          );
-        }
-
-        return ctx.dom.waitForElement(BLOCK_SEL).then(function (block) {
-          if (!block || ctx.isDisposed()) return;
-          ctx.on(block, 'click', onClick);
-          ctx.on(document, 'keydown', function (e) {
-            if (e.key === 'Escape') hideCard();
-          });
-        });
       },
     };
   });
@@ -6329,287 +4883,6 @@
   });
 
   /* ====================================================================== */
-  /* src/modules/skill-fractions.js */
-  __def("modules/skill-fractions", function (require, module, exports) {
-    /**
-     * Дроби опыта на полосках навыков.
-     *
-     * Идея из CatWar UwU (`showExactSkillsValues`): вставить `.bar-data` в `.skill .bar`,
-     * как у параметров в блоке «Состояние». Числа — из `parameter.data[key].tooltip`
-     * или расчёт по `parameter.level` + `barWidth`. Не парсим `.bar-fill` (там scaleX).
-     */
-
-    var BLOCK_SEL = '#parameters_skills_block';
-    var MARK = 'data-cwb-skill-fraction';
-    var DEFAULT_SKILLS = ['smell', 'dig', 'heal', 'swim', 'might', 'power', 'pet_faith', 'tree', 'observ'];
-
-    function parseFraction(tooltip) {
-      var m = /\((\d+(?:[.,]\d+)?)\/(\d+|∞)\)\s*$/.exec(tooltip || '');
-      if (!m) return null;
-      return String(m[1]).replace(',', '.') + '/' + m[2];
-    }
-
-    function fractionFromScale(parameter, skillInfo) {
-      var levels = parameter.level || [0, 1, 5, 20, 50, 200, 500, 1000, 3000, 10000];
-      var level = skillInfo.level;
-      if (level == null) return null;
-      var next = levels[level + 1];
-      if (next == null) return null;
-      var span = next - levels[level];
-      var inLvl = Math.floor((skillInfo.barWidth || 0) / 100 * span * 100) / 100;
-      return inLvl + '/' + span;
-    }
-
-    function skillFraction(parameter, key) {
-      var d = parameter.data && parameter.data[key];
-      if (!d || d.isHidden || d.level === undefined) return null;
-      return parseFraction(d.tooltip) || fractionFromScale(parameter, d);
-    }
-
-    module.exports = {
-      id: 'skill-fractions',
-      title: 'Дроби на навыках',
-      description: 'Опыт навыка на полоске (673/2000), как в блоке «Состояние».',
-      category: 'info',
-      pages: ['game'],
-      enabledByDefault: false,
-      order: 44,
-
-      defaults: {
-        format: 'fraction',
-      },
-
-      schema: [
-        {
-          key: 'format',
-          type: 'select',
-          label: 'Формат',
-          options: [
-            { value: 'fraction', label: 'Только дробь (673/2000)' },
-            { value: 'level+fraction', label: 'Уровень и дробь (7 · 673/2000)' },
-          ],
-        },
-      ],
-
-      styles: function () {
-        return [
-          BLOCK_SEL + ' .skill .bar { position: relative; }',
-          BLOCK_SEL + ' .skill .bar-data[' + MARK + '] {',
-          'position: absolute; left: 0; top: 0; width: 100%; height: 100%;',
-          'text-align: center; font-size: 10px; line-height: 15px;',
-          'color: var(--ui-on-accent, #fff); pointer-events: none; z-index: 2;',
-          'text-shadow: 1px 1px 2px #000;',
-          '}',
-        ].join('\n');
-      },
-
-      init: function (ctx) {
-        if (require('core/uwu').hasExactSkills()) {
-          ctx.log.info('UwU уже рисует дроби на навыках — не дублируем .bar-data');
-          return;
-        }
-        function clearMarks() {
-          ctx.dom.qsa('[' + MARK + ']').forEach(function (el) {
-            if (el.parentNode) el.parentNode.removeChild(el);
-          });
-        }
-
-        function formatLabel(parameter, key, fraction) {
-          if (!fraction) return '';
-          var d = parameter.data && parameter.data[key];
-          if (ctx.settings.get('format') === 'level+fraction' && d && d.level != null) {
-            return d.level + ' · ' + fraction;
-          }
-          return fraction;
-        }
-
-        function paint() {
-          if (ctx.isDisposed()) return;
-          var state = ctx.vue.getState();
-          if (!state || !state.parameter) return;
-
-          var parameter = state.parameter;
-          var keys = parameter.skills || DEFAULT_SKILLS;
-
-          keys.forEach(function (key) {
-            var skillEl = document.getElementById(key);
-            if (!skillEl || !skillEl.classList.contains('skill')) return;
-
-            var fraction = skillFraction(parameter, key);
-            var bar = skillEl.querySelector('.bar');
-            if (!bar) return;
-
-            if (!fraction) {
-              var stale = bar.querySelector('[' + MARK + ']');
-              if (stale && stale.parentNode) stale.parentNode.removeChild(stale);
-              return;
-            }
-
-            var barData = bar.querySelector('[' + MARK + ']');
-            if (!barData) {
-              barData = document.createElement('div');
-              barData.className = 'bar-data';
-              barData.setAttribute(MARK, '1');
-              bar.appendChild(barData);
-            }
-
-            var text = formatLabel(parameter, key, fraction);
-            if (barData.textContent !== text) barData.textContent = text;
-          });
-        }
-
-        function schedulePaint() {
-          if (ctx.isDisposed()) return;
-          requestAnimationFrame(paint);
-        }
-
-        ctx.addCleanup(clearMarks);
-
-        return ctx.dom.waitForElement(BLOCK_SEL).then(function (block) {
-          if (!block || ctx.isDisposed()) return;
-          ctx.observe(block, schedulePaint, { childList: true, subtree: true });
-          return ctx.whenVueReady().then(function (vm) {
-            if (!vm || ctx.isDisposed()) return;
-            schedulePaint();
-            ctx.watch('parameter.data', schedulePaint, { deep: true });
-            ctx.watch('parameter.skills', schedulePaint);
-          });
-        });
-      },
-    };
-  });
-
-  /* ====================================================================== */
-  /* src/modules/sounds.js */
-  __def("modules/sounds", function (require, module, exports) {
-    /**
-     * Звуки на игровые события (по мотивам CW Shed / UwU, но через $watch).
-     *
-     * Без внешних URL — Web Audio синтез в core/audio.js.
-     * Не эмитим сокет, только читаем Vue-стейт.
-     */
-
-    var audio = require('core/audio');
-
-    module.exports = {
-      id: 'sounds',
-      title: 'Звуки событий',
-      description: 'Короткие сигналы при ЛС, упоминании, конце действия и смене локации.',
-      category: 'sound',
-      pages: ['game'],
-      enabledByDefault: false,
-      order: 10,
-
-      defaults: {
-        volume: 0.35,
-        onPm: true,
-        onMention: true,
-        onActionEnd: true,
-        onMapChange: false,
-        onChat: false,
-        customUrl: '',
-      },
-
-      schema: [
-        { key: 'volume', type: 'range', label: 'Громкость', min: 0.05, max: 1, step: 0.05 },
-        { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение (бейдж ЛС)' },
-        { key: 'onMention', type: 'boolean', label: 'Упоминание твоего имени в чате' },
-        { key: 'onActionEnd', type: 'boolean', label: 'Конец действия / перехода' },
-        { key: 'onMapChange', type: 'boolean', label: 'Смена локации (карта)' },
-        { key: 'onChat', type: 'boolean', label: 'Новое сообщение в общем чате (бейдж)' },
-        {
-          key: 'customUrl',
-          type: 'text',
-          label: 'Ссылка на свой звук (необязательно)',
-          hint: 'Если есть — играет вместо встроенного звука на все события.',
-        },
-      ],
-
-      init: function (ctx) {
-        var prevAction = '';
-        var prevLoc = '';
-        var customAudio = null;
-
-        function vol() {
-          return ctx.settings.get('volume');
-        }
-
-        function playKind(kind) {
-          var url = String(ctx.settings.get('customUrl') || '').trim();
-          if (url) {
-            try {
-              if (!customAudio) customAudio = new Audio(url);
-              customAudio.volume = vol();
-              customAudio.currentTime = 0;
-              customAudio.play().catch(function () { /* автоплей */ });
-            } catch (e) {
-              audio.play(kind, vol());
-            }
-            return;
-          }
-          audio.play(kind, vol());
-        }
-
-        return ctx.whenVueReady().then(function (vm) {
-          if (!vm || ctx.isDisposed()) return;
-
-          prevAction = ctx.vue.get('cat.actionMess') || '';
-          prevLoc = (ctx.vue.get('field.location') || {}).name || '';
-
-          if (ctx.settings.get('onPm')) {
-            ctx.watch('game.notReadMess', function (now, was) {
-              if (typeof now === 'number' && typeof was === 'number' && now > was) playKind('pm');
-            });
-          }
-
-          if (ctx.settings.get('onChat')) {
-            ctx.watch('game.notReadChat', function (now, was) {
-              if (typeof now === 'number' && typeof was === 'number' && now > was) playKind('chat');
-            });
-          }
-
-          if (ctx.settings.get('onActionEnd')) {
-            ctx.watch('cat.actionMess', function (now) {
-              var cur = now || '';
-              if (prevAction && !cur) playKind('action');
-              prevAction = cur;
-            });
-          }
-
-          if (ctx.settings.get('onMapChange')) {
-            ctx.watch('field.location', function (loc) {
-              var name = (loc && loc.name) || '';
-              if (prevLoc && name && name !== prevLoc) playKind('map');
-              prevLoc = name;
-            }, { deep: true });
-          }
-
-          if (ctx.settings.get('onMention')) {
-            var myLogin = ctx.vue.get('cat.login') || '';
-            ctx.vue.onChatMessage(function (fresh) {
-              if (!myLogin) return;
-              fresh.forEach(function (msg) {
-                if (!msg || msg.cat === ctx.vue.get('cat.id')) return;
-                var text = String(msg.text || '');
-                if (/class=["']myname["']/.test(text) || text.indexOf('myname') >= 0) {
-                  playKind('mention');
-                }
-              });
-            });
-          }
-        });
-      },
-
-      onSettings: function (ctx, key) {
-        if (key === 'customUrl') return;
-        var registry = require('core/registry');
-        registry.stopModule('sounds');
-        registry.startModule('sounds');
-      },
-    };
-  });
-
-  /* ====================================================================== */
   /* src/modules/static-background.js */
   __def("modules/static-background", function (require, module, exports) {
     /**
@@ -6623,9 +4896,6 @@
      * CSS-ом сезонный <link> не выключить, поэтому для страницы есть отдельная
      * опция: помечаем такие stylesheet-ы disabled и возвращаем обратно в destroy.
      */
-
-    var IS_LU = false;
-    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
 
     var dom = require('core/dom');
 
@@ -6653,7 +4923,7 @@
         disableSeasonalCss: false,
       },
 
-      schema: IS_LU ? [
+      schema: [
         {
           key: 'mode',
           type: 'select',
@@ -6665,45 +4935,14 @@
         },
         { key: 'color', type: 'color', label: 'Цвет' },
         { key: 'imageUrl', type: 'text', label: 'Ссылка на картинку', placeholder: 'https://…/bg.png' },
-      ] : [
-        {
-          key: 'target',
-          type: 'select',
-          label: 'Что менять',
-          options: [
-            { value: 'field', label: 'Только фон локации' },
-            { value: 'page', label: 'Только фон страницы' },
-            { value: 'both', label: 'И то, и другое' },
-          ],
-        },
-        {
-          key: 'mode',
-          type: 'select',
-          label: 'Чем заменить',
-          options: [
-            { value: 'color', label: 'Сплошной цвет' },
-            { value: 'image', label: 'Картинка по ссылке' },
-          ],
-        },
-        { key: 'color', type: 'color', label: 'Цвет' },
-        { key: 'imageUrl', type: 'text', label: 'Ссылка на картинку', placeholder: 'https://…/bg.png' },
-        {
-          key: 'disableSeasonalCss',
-          type: 'boolean',
-          label: 'Отключить сезонный скин сайта',
-          hint: 'Убирает сезонные стили: шапку, боковины и фон оформления.',
-        },
       ],
 
       styles: function (s) {
         var bg = backgroundValue(s);
         var css = [];
-        if ((s.target === 'field' || s.target === 'both') && !require('core/uwu').hasFieldBackground()) {
+        if (!require('core/uwu').hasFieldBackground()) {
           // background целиком, чтобы убить и инлайновый background-image локации.
           css.push('#cages_div { background: ' + bg + ' !important; }');
-        }
-        if (s.target === 'page' || s.target === 'both') {
-          css.push('html, body { background: ' + bg + ' !important; }');
         }
         return css.join('\n');
       },

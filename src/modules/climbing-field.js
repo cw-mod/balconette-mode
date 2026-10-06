@@ -466,15 +466,13 @@ function cageTdAt(x, y) {
   return tds[(y - 1) * COLS + (x - 1)] || null;
 }
 
-var IS_LU = require('cwb:meta').variant === 'lu';
-
 module.exports = {
   id: 'climbing-field',
   title: 'Поле для ЛУ',
   description: 'Минное поле 10×6: вкладки, локации, цифры треска, мины и переходы. Карты не слетают после обновления.',
   category: 'field',
   pages: ['game'],
-  enabledByDefault: IS_LU,
+  enabledByDefault: false,
   order: 25,
 
   defaults: {
@@ -490,7 +488,7 @@ module.exports = {
     clearOnLocation: false,
   },
 
-  schema: IS_LU ? [
+  schema: [
     {
       key: 'blockDangerous',
       type: 'boolean',
@@ -502,60 +500,6 @@ module.exports = {
       type: 'boolean',
       label: 'Ставить цифру в клетку кота по треску в чате',
       hint: 'Берёт громкость из [треск] (0–7) и ставит в клетку, где стоит твой кот. Обычные системные реплики не считает.',
-    },
-    {
-      key: 'mapsEditor',
-      type: 'custom',
-      label: 'Вкладки и поля',
-      hint: 'Добавить, удалить или переименовать вкладки и таблицы внутри выбранной вкладки.',
-      render: renderMapsEditor,
-    },
-  ] : [
-    {
-      key: 'overlay',
-      type: 'boolean',
-      label: 'Дублировать пометки на игровом поле',
-      hint: 'Цвета и цифры на клетках игры — из этой карты, даже если рядом UwU.',
-    },
-    {
-      key: 'blockDangerous',
-      type: 'boolean',
-      label: 'Кач ЛУ: не нажимать на опасные клетки',
-      hint: 'Не даёт кликнуть и пойти с клавиатуры (WASD, QEZX) на мины, опаски и unsafe. Выключи, если хочешь ходить как обычно.',
-    },
-    {
-      key: 'uwuSync',
-      type: 'select',
-      label: 'Живая карта UwU',
-      hint: 'Новая пометка сразу пишется в открытую таблицу UwU, без экспорта. «Только UwU» прячет нашу панель и вешает «Кач ЛУ» на их минник.',
-      options: [
-        { value: 'off', label: 'Не синхронизировать' },
-        { value: 'both', label: 'Писать и к нам, и в UwU' },
-        { value: 'uwu', label: 'Только в UwU, нашу панель скрыть' },
-      ],
-    },
-    {
-      key: 'autoFromServer',
-      type: 'boolean',
-      label: 'Подтягивать ярусы деревьев из игры',
-      hint: 'Если игра уже знает ярус — пустые клетки заполнятся сами.',
-    },
-    {
-      key: 'autoFromChat',
-      type: 'boolean',
-      label: 'Ставить цифру в клетку кота по треску в чате',
-      hint: 'Берёт громкость из [треск] (0–7) и ставит в клетку, где стоит твой кот. Обычные системные реплики не считает.',
-    },
-    {
-      key: 'showSkill',
-      type: 'boolean',
-      label: 'Показывать своё лазание в шапке панели',
-    },
-    {
-      key: 'clearOnLocation',
-      type: 'boolean',
-      label: 'Очищать текущее поле при смене локации',
-      hint: 'По умолчанию выключено. Карты лежат во вкладках и не пропадают после обновления.',
     },
     {
       key: 'mapsEditor',
@@ -680,17 +624,14 @@ module.exports = {
     var tabsEl = dom.el('div', { id: 'cwb-lu-tabs' });
     var fieldsEl = dom.el('div', { id: 'cwb-lu-fields' });
     var overlayInput = dom.el('input', { type: 'checkbox', checked: !!ctx.settings.get('overlay') });
-    var overlayLabel = IS_LU ? dom.el('label', {
+    var overlayLabel = dom.el('label', {
       id: 'cwb-lu-overlay',
       title: 'Дублировать пометки (безопасно/мина/переход) и цифры на клетках игрового поля',
-    }, [overlayInput, document.createTextNode(' Переносить на игровую')]) : null;
-    if (overlayLabel) {
-      overlayLabel.addEventListener('change', function (e) {
-        if (e.target === overlayInput) ctx.settings.set('overlay', e.target.checked);
-      });
-    }
-    var navChildren = [dom.el('h3', { text: 'Вкладка' }), tabsEl, dom.el('h3', { text: 'Локация' }), fieldsEl];
-    if (overlayLabel) navChildren.unshift(overlayLabel);
+    }, [overlayInput, document.createTextNode(' Переносить на игровую')]);
+    overlayLabel.addEventListener('change', function (e) {
+      if (e.target === overlayInput) ctx.settings.set('overlay', e.target.checked);
+    });
+    var navChildren = [overlayLabel, dom.el('h3', { text: 'Вкладка' }), tabsEl, dom.el('h3', { text: 'Локация' }), fieldsEl];
     var nav = dom.el('div', { id: 'cwb-lu-nav' }, navChildren);
     var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавь поле или таблицу в настройках' });
     var trainBtn = dom.el('button', {

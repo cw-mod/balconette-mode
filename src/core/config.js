@@ -1,5 +1,6 @@
 /**
- * Настройки самого ядра (не модулей). Лежат в одном ключе `cwb:core`.
+ * Настройки самого ядра (не модулей). Сейчас только logLevel.
+ * Лежат в одном ключе `cwb:core`.
  */
 
 var storage = require('core/storage');
@@ -8,26 +9,9 @@ var KEY = 'core';
 
 var DEFAULTS = {
   logLevel: 'silent',       // silent | error | warn | info | debug
-  gearCorner: 'bottom-right', // положение кнопки-шестерёнки
-  gearHidden: false,        // спрятать шестерёнку (панель тогда только по хоткею)
-  hotkey: true,             // Ctrl+Alt+B открывает панель
-  socketHook: false,        // ранний хук WebSocket — опциональный механизм «на будущее»
 };
 
 var SCHEMA = [
-  {
-    key: 'gearCorner',
-    type: 'select',
-    label: 'Положение кнопки настроек',
-    options: [
-      { value: 'bottom-right', label: 'Внизу справа' },
-      { value: 'bottom-left', label: 'Внизу слева' },
-      { value: 'top-right', label: 'Вверху справа' },
-      { value: 'top-left', label: 'Вверху слева' },
-    ],
-  },
-  { key: 'gearHidden', type: 'boolean', label: 'Спрятать кнопку-шестерёнку', hint: 'Панель всё равно откроется по Ctrl+Alt+B' },
-  { key: 'hotkey', type: 'boolean', label: 'Открывать панель по Ctrl+Alt+B' },
   {
     key: 'logLevel',
     type: 'select',
@@ -40,17 +24,19 @@ var SCHEMA = [
       { value: 'debug', label: 'Отладка' },
     ],
   },
-  {
-    key: 'socketHook',
-    type: 'boolean',
-    label: 'Хук игрового сокета (экспериментально)',
-    hint: 'Пока никому не нужен. После включения перезагрузи страницу. На сервер ничего не шлёт.',
-  },
 ];
 
 function all() {
   var stored = storage.get(KEY, null);
-  return Object.assign({}, DEFAULTS, stored && typeof stored === 'object' ? stored : {});
+  var out = Object.assign({}, DEFAULTS);
+  if (stored && typeof stored === 'object') {
+    for (var key in DEFAULTS) {
+      if (Object.prototype.hasOwnProperty.call(DEFAULTS, key) && key in stored) {
+        out[key] = stored[key];
+      }
+    }
+  }
+  return out;
 }
 
 function get(key) {

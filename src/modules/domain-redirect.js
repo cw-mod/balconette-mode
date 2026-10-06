@@ -204,9 +204,6 @@ function createRedirectModule(opts) {
   return mod;
 }
 
-var IS_LU = false;
-try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
-
 var mod = createRedirectModule({
   id: 'domain-redirect',
   title: 'Редирект catwar.net → .su',
@@ -228,26 +225,7 @@ var mod = createRedirectModule({
     interceptNetwork: true,
   },
 
-  schema: IS_LU ? [] : [
-    {
-      key: 'redirectPage',
-      type: 'boolean',
-      label: 'Перенаправлять открытие catwar.net',
-      hint: 'Если вкладка открылась на catwar.net — кинет на тот же путь на .su.',
-    },
-    {
-      key: 'rewriteDom',
-      type: 'boolean',
-      label: 'Подменять .net в ссылках и картинках',
-      hint: 'Ссылки, картинки, клики и window.open.',
-    },
-    {
-      key: 'interceptNetwork',
-      type: 'boolean',
-      label: 'Подменять .net в fetch и XHR',
-      hint: 'Свои запросы не шлёт, только правит адрес у тех, что уже идут.',
-    },
-  ],
+  schema: [],
 });
 
 /* Если работает обратный редирект (su → .net), а включили нас (net → .su) —

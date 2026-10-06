@@ -10,9 +10,6 @@
  * дублируя более надёжным $watch по стейту, если Vue доступен.
  */
 
-var IS_LU = false;
-try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
-
 var dom = require('core/dom');
 
 module.exports = {
@@ -30,16 +27,7 @@ module.exports = {
     smooth: false,
   },
 
-  schema: IS_LU ? [] : [
-    {
-      key: 'respectUserScroll',
-      type: 'boolean',
-      label: 'Не мешать, если прокрутил вверх',
-      hint: 'Автопрокрутка вернётся, как только снова окажешься внизу.',
-    },
-    { key: 'threshold', type: 'number', label: 'Зона «у низа», px', min: 0, max: 600, step: 10 },
-    { key: 'smooth', type: 'boolean', label: 'Плавная прокрутка' },
-  ],
+  schema: [],
 
   init: function (ctx) {
     var target = null;   // прокручиваемый контейнер
