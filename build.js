@@ -3,7 +3,8 @@
  * Сборка юзерскрипта без внешних зависимостей.
  *
  * Полный бандл: каждый .js из src/ (кроме шапок) оборачивается в фабрику CommonJS-lite.
- * Бандл «только ЛУ»: то же ядро src/core/ и один модуль src/modules/climbing-field.js.
+ * Бандл ЛУ: то же ядро src/core/ и данные src/data/, плюс отобранные модули
+ * (список в VARIANTS ниже).
  *   __def('core/storage', function (require, module, exports) { ...тело файла... });
  * Порядок файлов в бандле не важен: require() ленивый.
  *
@@ -30,7 +31,22 @@ const VARIANTS = [
     id: 'lu',
     headerFile: path.join(SRC, 'header-lu.txt'),
     baseName: 'catwar-balconette-lu',
-    modules: ['climbing-field'],
+    // ЛУ-вариант: поле для ЛУ + отобранные модули основного скрипта
+    // (координаты клеток, кот↔действия, старые иконки, автопрокрутка,
+    // ID в ЛС, уведомления, редиректы, статичный фон, погода).
+    modules: [
+      'climbing-field',
+      'cell-coords',
+      'layout-swap',
+      'old-icons',
+      'history-autoscroll',
+      'pm-ids',
+      'notifications',
+      'domain-redirect',
+      'domain-redirect-reverse',
+      'static-background',
+      'hide-weather',
+    ],
   },
 ];
 
@@ -67,7 +83,8 @@ function filesForVariant(variant) {
   return files.filter((file) => {
     const name = moduleName(file);
     if (name.startsWith('modules/')) return allow.has(name);
-    return name.startsWith('core/');
+    // Ядро и данные (например, src/data/old-icons.js для модуля old-icons).
+    return name.startsWith('core/') || name.startsWith('data/');
   });
 }
 

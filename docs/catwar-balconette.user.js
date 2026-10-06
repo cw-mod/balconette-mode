@@ -2,7 +2,7 @@
 // @name         CatWar Balconette
 // @name:ru      CatWar Balconette
 // @namespace    catwar-balconette
-// @version      0.1.7
+// @version      0.1.8
 // @description  Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
 // @description:ru Мод для CatWar. Настройки в одной панели, каждый кусок включается отдельно.
 // @author       balconette
@@ -30,9 +30,9 @@
 (function () {
   'use strict';
 
-  var CWB_VERSION = "0.1.7";
+  var CWB_VERSION = "0.1.8";
   var CWB_VARIANT = "full";
-  var CWB_MODULE_IDS = ["action-title","always-day","cell-coords","climbing-field","clock","copy-id","domain-redirect","grid","hide-cat-tooltip","hide-weather","highlight-moves","history-autoscroll","hunt-smell-square","layout-swap","mouth-cat-ids","mouth-item-ids","notifications","old-icons","param-info","pm-ids","skill-fractions","sounds","static-background"];
+  var CWB_MODULE_IDS = ["action-title","always-day","cell-coords","climbing-field","clock","copy-id","domain-redirect-reverse","domain-redirect","grid","hide-cat-tooltip","hide-weather","highlight-moves","history-autoscroll","hunt-smell-square","layout-swap","mouth-cat-ids","mouth-item-ids","notifications","old-icons","param-info","pm-ids","skill-fractions","sounds","static-background"];
 
   var __factories = Object.create(null);
   var __cache = Object.create(null);
@@ -1410,6 +1410,7 @@
     var config = require('core/config');
     var uwu = require('core/uwu');
     var meta = require('cwb:meta');
+    var IS_LU = meta.variant === 'lu';
 
     var ROOT_ID = 'cwb-root';
     var STYLE_ID = 'core-ui';
@@ -1516,6 +1517,7 @@
         '.cwb-opt input[type=range]{width:150px;}',
         '.cwb-opt-val{font-size:12px;color:#8a7f70;min-width:34px;}',
         '.cwb-opt-full{flex-direction:column;align-items:stretch;}',
+        '.cwb-opt-full .cwb-opt-label{flex:0 0 auto;}',
 
         '.cwb-maps-editor{display:flex;flex-direction:column;gap:8px;width:100%;}',
         '.cwb-maps-editor h4{margin:4px 0 0;font-size:12px;}',
@@ -1649,14 +1651,16 @@
             registry.setSetting(mod.id, item.key, value);
           }));
         });
-        opts.appendChild(dom.el('div', { class: 'cwb-opt' }, [
-          dom.el('button', {
-            class: 'cwb-btn',
-            type: 'button',
-            text: 'Сбросить настройки',
-            onclick: function () { registry.resetSettings(mod.id); render(); },
-          }),
-        ]));
+        if (!IS_LU) {
+          opts.appendChild(dom.el('div', { class: 'cwb-opt' }, [
+            dom.el('button', {
+              class: 'cwb-btn',
+              type: 'button',
+              text: 'Сбросить настройки',
+              onclick: function () { registry.resetSettings(mod.id); render(); },
+            }),
+          ]));
+        }
       }
 
       var sw = dom.el('label', { class: 'cwb-sw' }, [
@@ -1789,10 +1793,10 @@
       var focusHint = captureFocusHint();
       var query = state.query.trim().toLowerCase();
       state.listEl.textContent = '';
-      paintTabs();
+      if (!IS_LU) paintTabs();
 
-      if (!query && state.tab === 'new') state.listEl.appendChild(coreCard());
-      if (!query && state.tab === 'overlay') {
+      if (!query && (IS_LU || state.tab === 'new')) state.listEl.appendChild(coreCard());
+      if (!query && !IS_LU && state.tab === 'overlay') {
         state.listEl.appendChild(dom.el('div', {
           class: 'cwb-uwu-banner',
           text: uwu.present()
@@ -1805,7 +1809,7 @@
       registry.CATEGORIES.forEach(function (cat) {
         var mods = registry.list().filter(function (m) {
           if (m.category !== cat.id || !matchesQuery(m, query)) return false;
-          return query ? true : matchesTab(m, state.tab);
+          return query || IS_LU ? true : matchesTab(m, state.tab);
         });
         if (!mods.length) return;
         shown += mods.length;
@@ -1890,61 +1894,69 @@
       var search = dom.el('input', { class: 'cwb-search', type: 'search', placeholder: 'Поиск по модулям…' });
       search.addEventListener('input', function (e) { state.query = e.target.value; render(); });
 
-      var tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
-      TABS.forEach(function (tab) {
-        var btn = dom.el('button', {
-          class: 'cwb-tab',
-          type: 'button',
-          role: 'tab',
-          'data-cwb-tab': tab.id,
-          'aria-selected': tab.id === state.tab ? 'true' : 'false',
-          text: tab.title,
+      var tabs = null;
+      var tabNote = null;
+      if (!IS_LU) {
+        tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
+        TABS.forEach(function (tab) {
+          var btn = dom.el('button', {
+            class: 'cwb-tab',
+            type: 'button',
+            role: 'tab',
+            'data-cwb-tab': tab.id,
+            'aria-selected': tab.id === state.tab ? 'true' : 'false',
+            text: tab.title,
+          });
+          btn.addEventListener('click', function () {
+            if (state.tab === tab.id) return;
+            state.tab = tab.id;
+            render();
+          });
+          tabs.appendChild(btn);
         });
-        btn.addEventListener('click', function () {
-          if (state.tab === tab.id) return;
-          state.tab = tab.id;
-          render();
-        });
-        tabs.appendChild(btn);
-      });
-      var tabNote = dom.el('div', { class: 'cwb-tab-note' });
+        tabNote = dom.el('div', { class: 'cwb-tab-note' });
+      }
 
       var list = dom.el('div', { class: 'cwb-body' });
 
-      var modal = dom.el('div', { class: 'cwb-modal' }, [
+      var modalChildren = [
         dom.el('div', { class: 'cwb-head' }, [
           dom.el('div', { class: 'cwb-title', text: 'CatWar Balconette' }),
           dom.el('div', { class: 'cwb-ver', text: 'v' + meta.version }),
           search,
           dom.el('button', { class: 'cwb-x', type: 'button', title: 'Закрыть', text: '×', onclick: close }),
         ]),
-        tabs,
-        tabNote,
-        list,
-        dom.el('div', { class: 'cwb-foot' }, [
-          dom.el('button', {
-            class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
-            onclick: function () {
-              try { storage.exportToFile(); toast('Настройки сохранены'); }
-              catch (e) { log.error(e); toast('Не получилось сохранить настройки'); }
-            },
-          }),
-          dom.el('button', {
-            class: 'cwb-btn', type: 'button', text: 'Импорт настроек',
-            onclick: function () {
-              storage.importFromFile().then(function (count) {
-                if (!count) return;
-                toast('Загружено: ' + count + '. Перезагрузи страницу.');
-                render();
-              }).catch(function (e) {
-                log.error(e);
-                toast('Файл не подошёл: ' + e.message);
-              });
-            },
-          }),
-          dom.el('div', { class: 'cwb-foot-note', text: 'Хранилище: ' + storage.backend }),
-        ]),
-      ]);
+      ];
+      if (tabs) {
+        modalChildren.push(tabs);
+        modalChildren.push(tabNote);
+      }
+      modalChildren.push(list);
+      modalChildren.push(dom.el('div', { class: 'cwb-foot' }, [
+        dom.el('button', {
+          class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
+          onclick: function () {
+            try { storage.exportToFile(); toast('Настройки сохранены'); }
+            catch (e) { log.error(e); toast('Не получилось сохранить настройки'); }
+          },
+        }),
+        dom.el('button', {
+          class: 'cwb-btn', type: 'button', text: 'Импорт настроек',
+          onclick: function () {
+            storage.importFromFile().then(function (count) {
+              if (!count) return;
+              toast('Загружено: ' + count + '. Перезагрузи страницу.');
+              render();
+            }).catch(function (e) {
+              log.error(e);
+              toast('Файл не подошёл: ' + e.message);
+            });
+          },
+        }),
+        dom.el('div', { class: 'cwb-foot-note', text: 'Хранилище: ' + storage.backend }),
+      ]));
+
+      var modal = dom.el('div', { class: 'cwb-modal' }, modalChildren);
 
       var overlay = dom.el('div', { class: 'cwb-overlay', hidden: true }, [modal]);
       overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) close(); });
@@ -1974,8 +1986,8 @@
         }
       }, true));
 
-      // Панель живёт рядом с реестром: любое изменение — перерисовка.
-      state.offRegistry = registry.onChange(function () { if (state.open) render(); });
+      // Панель живёт рядом с реестром: перерисовка только при вкл/выкл модуля.
+      state.offRegistry = registry.onChange(function (id, kind) { if (state.open && kind === 'enabled') render(); });
       config.onChange(applyCoreSettings);
 
       applyCoreSettings();
@@ -2954,6 +2966,9 @@
      * См. CORRECTIONS.md и RUNTIME.md §8.10.
      */
 
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
     var SEL_TABLE = '#cages';
     var SEL_CELL = SEL_TABLE + ' td.cage';
 
@@ -2980,7 +2995,7 @@
         hideInSmell: true,
       },
 
-      schema: [
+      schema: IS_LU ? [] : [
         { key: 'showTree', type: 'boolean', label: 'Показывать ярус дерева' },
         { key: 'hideInSmell', type: 'boolean', label: 'Скрывать в режиме нюха' },
       ],
@@ -3520,13 +3535,15 @@
       return tds[(y - 1) * COLS + (x - 1)] || null;
     }
 
+    var IS_LU = require('cwb:meta').variant === 'lu';
+
     module.exports = {
       id: 'climbing-field',
       title: 'Поле для ЛУ',
       description: 'Минное поле 10×6: вкладки, локации, цифры треска, мины и переходы. Карты не слетают после обновления.',
       category: 'field',
       pages: ['game'],
-      enabledByDefault: require('cwb:meta').variant === 'lu',
+      enabledByDefault: IS_LU,
       order: 25,
 
       defaults: {
@@ -3542,7 +3559,27 @@
         clearOnLocation: false,
       },
 
-      schema: [
+      schema: IS_LU ? [
+        {
+          key: 'blockDangerous',
+          type: 'boolean',
+          label: 'Кач ЛУ: не нажимать на опасные клетки',
+          hint: 'Не даёт кликнуть и пойти с клавиатуры (WASD, QEZX) на мины, опаски и unsafe. Выключи, если хочешь ходить как обычно.',
+        },
+        {
+          key: 'autoFromChat',
+          type: 'boolean',
+          label: 'Ставить цифру в клетку кота по треску в чате',
+          hint: 'Берёт громкость из [треск] (0–7) и ставит в клетку, где стоит твой кот. Обычные системные реплики не считает.',
+        },
+        {
+          key: 'mapsEditor',
+          type: 'custom',
+          label: 'Вкладки и поля',
+          hint: 'Добавить, удалить или переименовать вкладки и таблицы внутри выбранной вкладки.',
+          render: renderMapsEditor,
+        },
+      ] : [
         {
           key: 'overlay',
           type: 'boolean',
@@ -3647,7 +3684,8 @@
           'z-index:40;font:700 12px/1 ui-monospace,Menlo,Consolas,monospace;padding:1px 3px;border-radius:3px;',
           'background:rgba(0,0,0,.78);color:#ffe9a8;pointer-events:none;}',
           '#cages td.cage[data-cwb-lu="X"]::after{background:rgba(160,0,0,.85);color:#fff;}',
-          '#cages td.cage[data-cwb-lu="="]::after{background:rgba(255,255,255,.75);color:#222;}',
+          '#cwb-lu-overlay{display:flex;align-items:center;gap:5px;margin:0 0 6px;font-size:11px;cursor:pointer;opacity:.9;}',
+          '#cwb-lu-overlay:hover{opacity:1;}',
         ].join('');
       },
 
@@ -3710,12 +3748,19 @@
 
         var tabsEl = dom.el('div', { id: 'cwb-lu-tabs' });
         var fieldsEl = dom.el('div', { id: 'cwb-lu-fields' });
-        var nav = dom.el('div', { id: 'cwb-lu-nav' }, [
-          dom.el('h3', { text: 'Вкладка' }),
-          tabsEl,
-          dom.el('h3', { text: 'Локация' }),
-          fieldsEl,
-        ]);
+        var overlayInput = dom.el('input', { type: 'checkbox', checked: !!ctx.settings.get('overlay') });
+        var overlayLabel = IS_LU ? dom.el('label', {
+          id: 'cwb-lu-overlay',
+          title: 'Дублировать пометки (безопасно/мина/переход) и цифры на клетках игрового поля',
+        }, [overlayInput, document.createTextNode(' Переносить на игровую')]) : null;
+        if (overlayLabel) {
+          overlayLabel.addEventListener('change', function (e) {
+            if (e.target === overlayInput) ctx.settings.set('overlay', e.target.checked);
+          });
+        }
+        var navChildren = [dom.el('h3', { text: 'Вкладка' }), tabsEl, dom.el('h3', { text: 'Локация' }), fieldsEl];
+        if (overlayLabel) navChildren.unshift(overlayLabel);
+        var nav = dom.el('div', { id: 'cwb-lu-nav' }, navChildren);
         var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавь поле или таблицу в настройках' });
         var trainBtn = dom.el('button', {
           type: 'button',
@@ -4742,10 +4787,64 @@
   });
 
   /* ====================================================================== */
+  /* src/modules/domain-redirect-reverse.js */
+  __def("modules/domain-redirect-reverse", function (require, module, exports) {
+    /**
+     * Редирект и подмена catwar.su → catwar.net.
+     */
+
+    var createRedirectModule;
+    try {
+      // В бандле имена модулей вида 'modules/<id>'.
+      createRedirectModule = require('modules/domain-redirect').createRedirectModule;
+    } catch (e) {
+      // В чистом Node (юнит-тесты) работает только относительный путь.
+      createRedirectModule = require('./domain-redirect').createRedirectModule;
+    }
+
+    var mod = createRedirectModule({
+      id: 'domain-redirect-reverse',
+      title: 'Редирект catwar.su → .net',
+      description: 'Кидает с catwar.su на catwar.net и чинит ссылки, картинки и запросы.',
+      category: 'misc',
+      pages: ['*'],
+      early: true,
+      enabledByDefault: false,
+      order: 6,
+      compat: 'new',
+
+      fromPrefixes: ['https://catwar.su', 'http://catwar.su', '//catwar.su'],
+      toOrigin: 'https://catwar.net',
+      hostRe: /(^|\.)catwar\.su$/i,
+
+      defaults: {
+        redirectPage: true,
+        rewriteDom: true,
+        interceptNetwork: true,
+      },
+
+      schema: [],
+    });
+
+    var origInit = mod.init;
+    mod.init = function (ctx) {
+      var registry;
+      try { registry = require('core/registry'); } catch (e) {}
+      if (registry && typeof registry.isEnabled === 'function' && registry.isEnabled('domain-redirect')) {
+        ctx.log.warn('domain-redirect-reverse не применён: domain-redirect уже включён.');
+        return;
+      }
+      origInit(ctx);
+    };
+
+    module.exports = mod;
+  });
+
+  /* ====================================================================== */
   /* src/modules/domain-redirect.js */
   __def("modules/domain-redirect", function (require, module, exports) {
     /**
-     * Редирект и подмена catwar.net → catwar.su.
+     * Редирект и подмена домена.
      *
      * Поведение по мотивам userscript «Перенаправление ссылок CatWar»
      * https://github.com/cat-be/catwar-domain-redirect (автор 1080554, v1.1).
@@ -4755,158 +4854,205 @@
      * переходах, ссылках и запросах. На живую игру вторую вкладку не открывает.
      */
 
-    var FROM_HTTPS = 'https://catwar.net';
-    var FROM_HTTP = 'http://catwar.net';
-    var FROM_PROTOREL = '//catwar.net';
-    var TO = 'https://catwar.su';
-    var HOST_RE = /(^|\.)catwar\.net$/i;
+    function createRedirectModule(opts) {
+      var fromPrefixes = opts.fromPrefixes;
+      var toOrigin = opts.toOrigin;
+      var hostRe = opts.hostRe;
 
-    function replaceDomain(url) {
-      if (!url || typeof url !== 'string') return url;
-      if (url.indexOf(FROM_HTTPS) === 0) return TO + url.slice(FROM_HTTPS.length);
-      if (url.indexOf(FROM_HTTP) === 0) return TO + url.slice(FROM_HTTP.length);
-      if (url.indexOf(FROM_PROTOREL) === 0) return TO + url.slice(FROM_PROTOREL.length);
-      return url;
-    }
-
-    function rewriteText(text) {
-      if (!text || typeof text !== 'string') return text;
-      return text.split(FROM_HTTPS).join(TO).split(FROM_HTTP).join(TO).split(FROM_PROTOREL).join('//catwar.su');
-    }
-
-    function rewriteSrcset(value) {
-      if (!value || typeof value !== 'string') return value;
-      return value.split(',').map(function (part) {
-        var trimmed = part.trim();
-        var i = trimmed.indexOf(' ');
-        if (i === -1) return replaceDomain(trimmed);
-        return replaceDomain(trimmed.slice(0, i)) + trimmed.slice(i);
-      }).join(', ');
-    }
-
-    /** Куда увести открытую страницу catwar.net. Иначе null. */
-    function redirectTarget(href) {
-      if (!href || typeof href !== 'string') return null;
-      if (href.indexOf(FROM_HTTPS) === 0) return TO + href.slice(FROM_HTTPS.length);
-      if (href.indexOf(FROM_HTTP) === 0) return TO + href.slice(FROM_HTTP.length);
-      try {
-        var url = new URL(href);
-        if (!HOST_RE.test(url.hostname)) return null;
-        return TO + url.pathname + url.search + url.hash;
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function rewriteResource(resource) {
-      if (typeof resource === 'string') return replaceDomain(resource);
-      if (resource && typeof Request === 'function' && resource instanceof Request) {
-        var next = replaceDomain(resource.url);
-        if (next === resource.url) return resource;
-        try { return new Request(next, resource); } catch (e) { return resource; }
-      }
-      return resource;
-    }
-
-    function processElement(el) {
-      if (!el || el.nodeType !== 1 || !el.hasAttribute) return;
-
-      ['href', 'src', 'poster'].forEach(function (attr) {
-        if (!el.hasAttribute(attr)) return;
-        var oldVal = el.getAttribute(attr);
-        var newVal = replaceDomain(oldVal);
-        if (newVal !== oldVal) el.setAttribute(attr, newVal);
-      });
-
-      if (el.hasAttribute('srcset')) {
-        var oldSrcset = el.getAttribute('srcset');
-        var newSrcset = rewriteSrcset(oldSrcset);
-        if (newSrcset !== oldSrcset) el.setAttribute('srcset', newSrcset);
+      function replaceDomain(url) {
+        if (!url || typeof url !== 'string') return url;
+        for (var i = 0; i < fromPrefixes.length; i++) {
+          var p = fromPrefixes[i];
+          if (url.indexOf(p) === 0) return toOrigin + url.slice(p.length);
+        }
+        return url;
       }
 
-      if (el.hasAttribute('style')) {
-        var oldStyle = el.getAttribute('style');
-        var newStyle = rewriteText(oldStyle);
-        if (newStyle !== oldStyle) el.setAttribute('style', newStyle);
-      }
-    }
-
-    function processAll(root) {
-      if (!root) root = document;
-      if (!root.querySelectorAll) return;
-      var nodes = root.querySelectorAll('[href], [src], [poster], [srcset], [style]');
-      for (var i = 0; i < nodes.length; i++) processElement(nodes[i]);
-    }
-
-    function applySettings(ctx) {
-      var target = redirectTarget(location.href);
-      if (target && ctx.settings.get('redirectPage')) {
-        try { location.replace(target); } catch (e) { ctx.log.warn('не удалось перенаправить', e); }
-        return;
+      function rewriteText(text) {
+        if (!text || typeof text !== 'string') return text;
+        var result = text;
+        for (var i = 0; i < fromPrefixes.length; i++) {
+          var p = fromPrefixes[i];
+          var repl = (p.slice(0, 2) === '//' && p.indexOf('://') === -1)
+            ? '//' + toOrigin.replace(/^https?:\/\//, '')
+            : toOrigin;
+          result = result.split(p).join(repl);
+        }
+        return result;
       }
 
-      if (ctx.settings.get('rewriteDom')) {
-        processAll(document);
-        ctx.on(document, 'DOMContentLoaded', function () { processAll(document); });
-        ctx.on(document, 'click', function (e) {
-          var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-          if (!link) return;
-          var oldHref = link.getAttribute('href');
-          var newHref = replaceDomain(oldHref);
-          if (newHref !== oldHref) link.setAttribute('href', newHref);
-        }, true);
+      function rewriteSrcset(value) {
+        if (!value || typeof value !== 'string') return value;
+        return value.split(',').map(function (part) {
+          var trimmed = part.trim();
+          var i = trimmed.indexOf(' ');
+          if (i === -1) return replaceDomain(trimmed);
+          return replaceDomain(trimmed.slice(0, i)) + trimmed.slice(i);
+        }).join(', ');
+      }
 
-        var originalOpen = window.open;
-        window.open = function (url) {
-          var next = replaceDomain(url);
-          var args = [next].concat([].slice.call(arguments, 1));
-          if (typeof originalOpen === 'function') return originalOpen.apply(this, args);
+      /** Куда увести открытую страницу. Иначе null. */
+      function redirectTarget(href) {
+        if (!href || typeof href !== 'string') return null;
+        for (var i = 0; i < fromPrefixes.length; i++) {
+          var p = fromPrefixes[i];
+          if (href.indexOf(p) === 0) return toOrigin + href.slice(p.length);
+        }
+        try {
+          var url = new URL(href);
+          if (!hostRe.test(url.hostname)) return null;
+          return toOrigin + url.pathname + url.search + url.hash;
+        } catch (e) {
           return null;
-        };
-        ctx.addCleanup(function () { window.open = originalOpen; });
+        }
+      }
 
-        var root = document.documentElement || document;
-        ctx.observe(root, function (mutations) {
-          for (var i = 0; i < mutations.length; i++) {
-            var mutation = mutations[i];
-            if (mutation.type === 'attributes') processElement(mutation.target);
-            var nodes = mutation.addedNodes;
-            for (var j = 0; j < nodes.length; j++) {
-              var node = nodes[j];
-              if (!node || node.nodeType !== 1) continue;
-              processElement(node);
-              processAll(node);
-            }
-          }
-        }, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['href', 'src', 'poster', 'srcset', 'style'],
+      function rewriteResource(resource) {
+        if (typeof resource === 'string') return replaceDomain(resource);
+        if (resource && typeof Request === 'function' && resource instanceof Request) {
+          var next = replaceDomain(resource.url);
+          if (next === resource.url) return resource;
+          try { return new Request(next, resource); } catch (e) { return resource; }
+        }
+        return resource;
+      }
+
+      function processElement(el) {
+        if (!el || el.nodeType !== 1 || !el.hasAttribute) return;
+
+        ['href', 'src', 'poster'].forEach(function (attr) {
+          if (!el.hasAttribute(attr)) return;
+          var oldVal = el.getAttribute(attr);
+          var newVal = replaceDomain(oldVal);
+          if (newVal !== oldVal) el.setAttribute(attr, newVal);
         });
-      }
 
-      if (ctx.settings.get('interceptNetwork')) {
-        if (typeof window.fetch === 'function') {
-          var originalFetch = window.fetch;
-          window.fetch = function (resource, init) {
-            return originalFetch.call(this, rewriteResource(resource), init);
-          };
-          ctx.addCleanup(function () { window.fetch = originalFetch; });
+        if (el.hasAttribute('srcset')) {
+          var oldSrcset = el.getAttribute('srcset');
+          var newSrcset = rewriteSrcset(oldSrcset);
+          if (newSrcset !== oldSrcset) el.setAttribute('srcset', newSrcset);
         }
 
-        if (typeof XMLHttpRequest === 'function' && XMLHttpRequest.prototype) {
-          var originalXhrOpen = XMLHttpRequest.prototype.open;
-          XMLHttpRequest.prototype.open = function (method, url) {
-            var args = [method, replaceDomain(url)].concat([].slice.call(arguments, 2));
-            return originalXhrOpen.apply(this, args);
-          };
-          ctx.addCleanup(function () { XMLHttpRequest.prototype.open = originalXhrOpen; });
+        if (el.hasAttribute('style')) {
+          var oldStyle = el.getAttribute('style');
+          var newStyle = rewriteText(oldStyle);
+          if (newStyle !== oldStyle) el.setAttribute('style', newStyle);
         }
       }
+
+      function processAll(root) {
+        if (!root) root = document;
+        if (!root.querySelectorAll) return;
+        var nodes = root.querySelectorAll('[href], [src], [poster], [srcset], [style]');
+        for (var i = 0; i < nodes.length; i++) processElement(nodes[i]);
+      }
+
+      function applySettings(ctx) {
+        var target = redirectTarget(location.href);
+        if (target && ctx.settings.get('redirectPage')) {
+          try { location.replace(target); } catch (e) { ctx.log.warn('не удалось перенаправить', e); }
+          return;
+        }
+
+        if (ctx.settings.get('rewriteDom')) {
+          processAll(document);
+          ctx.on(document, 'DOMContentLoaded', function () { processAll(document); });
+          ctx.on(document, 'click', function (e) {
+            var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+            if (!link) return;
+            var oldHref = link.getAttribute('href');
+            var newHref = replaceDomain(oldHref);
+            if (newHref !== oldHref) link.setAttribute('href', newHref);
+          }, true);
+
+          var originalOpen = window.open;
+          window.open = function (url) {
+            var next = replaceDomain(url);
+            var args = [next].concat([].slice.call(arguments, 1));
+            if (typeof originalOpen === 'function') return originalOpen.apply(this, args);
+            return null;
+          };
+          ctx.addCleanup(function () { window.open = originalOpen; });
+
+          var root = document.documentElement || document;
+          ctx.observe(root, function (mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+              var mutation = mutations[i];
+              if (mutation.type === 'attributes') processElement(mutation.target);
+              var nodes = mutation.addedNodes;
+              for (var j = 0; j < nodes.length; j++) {
+                var node = nodes[j];
+                if (!node || node.nodeType !== 1) continue;
+                processElement(node);
+                processAll(node);
+              }
+            }
+          }, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['href', 'src', 'poster', 'srcset', 'style'],
+          });
+        }
+
+        if (ctx.settings.get('interceptNetwork')) {
+          if (typeof window.fetch === 'function') {
+            var originalFetch = window.fetch;
+            window.fetch = function (resource, init) {
+              return originalFetch.call(this, rewriteResource(resource), init);
+            };
+            ctx.addCleanup(function () { window.fetch = originalFetch; });
+          }
+
+          if (typeof XMLHttpRequest === 'function' && XMLHttpRequest.prototype) {
+            var originalXhrOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function (method, url) {
+              var args = [method, replaceDomain(url)].concat([].slice.call(arguments, 2));
+              return originalXhrOpen.apply(this, args);
+            };
+            ctx.addCleanup(function () { XMLHttpRequest.prototype.open = originalXhrOpen; });
+          }
+        }
+      }
+
+      var mod = {
+        id: opts.id,
+        title: opts.title,
+        description: opts.description,
+        category: opts.category,
+        pages: opts.pages,
+        early: opts.early,
+        enabledByDefault: opts.enabledByDefault,
+        order: opts.order,
+        compat: opts.compat,
+
+        defaults: opts.defaults,
+
+        schema: opts.schema,
+
+        init: function (ctx) {
+          if (opts.init) {
+            var result = opts.init(ctx);
+            if (result === false) return;
+          }
+          applySettings(ctx);
+        },
+      };
+
+      mod.replaceDomain = replaceDomain;
+      mod.redirectTarget = redirectTarget;
+      mod.rewriteSrcset = rewriteSrcset;
+      mod.rewriteText = rewriteText;
+      mod.rewriteResource = rewriteResource;
+      mod.processElement = processElement;
+
+      return mod;
     }
 
-    var mod = {
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
+    var mod = createRedirectModule({
       id: 'domain-redirect',
       title: 'Редирект catwar.net → .su',
       description: 'Кидает с catwar.net на catwar.su и чинит ссылки, картинки и запросы. По умолчанию включён.',
@@ -4917,13 +5063,17 @@
       order: 5,
       compat: 'new',
 
+      fromPrefixes: ['https://catwar.net', 'http://catwar.net', '//catwar.net'],
+      toOrigin: 'https://catwar.su',
+      hostRe: /(^|\.)catwar\.net$/i,
+
       defaults: {
         redirectPage: true,
         rewriteDom: true,
         interceptNetwork: true,
       },
 
-      schema: [
+      schema: IS_LU ? [] : [
         {
           key: 'redirectPage',
           type: 'boolean',
@@ -4943,20 +5093,25 @@
           hint: 'Свои запросы не шлёт, только правит адрес у тех, что уже идут.',
         },
       ],
+    });
 
-      init: function (ctx) {
-        applySettings(ctx);
-      },
+    /* Если работает обратный редирект (su → .net), а включили нас (net → .su) —
+       останавливаем его: работают оба = бесконечный ping-pong редиректов.
+       Обратный порядок (включили reverse при работающем нами) закрыт в его init. */
+    var origInit = mod.init;
+    mod.init = function (ctx) {
+      try {
+        var registry = require('core/registry');
+        if (registry && typeof registry.isRunning === 'function' && registry.isRunning('domain-redirect-reverse')) {
+          registry.setEnabled('domain-redirect-reverse', false);
+          ctx.log.warn('обратный редирект (su → .net) выключен: работает net → .su');
+        }
+      } catch (e) { /* реестр недоступен (юнит-тесты в Node) — пропускаем */ }
+      origInit(ctx);
     };
 
-    mod.replaceDomain = replaceDomain;
-    mod.redirectTarget = redirectTarget;
-    mod.rewriteSrcset = rewriteSrcset;
-    mod.rewriteText = rewriteText;
-    mod.rewriteResource = rewriteResource;
-    mod.processElement = processElement;
-
     module.exports = mod;
+    module.exports.createRedirectModule = createRedirectModule;
   });
 
   /* ====================================================================== */
@@ -5075,6 +5230,9 @@
   /* ====================================================================== */
   /* src/modules/hide-weather.js */
   __def("modules/hide-weather", function (require, module, exports) {
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
     /**
      * Скрыть погоду.
      *
@@ -5099,7 +5257,7 @@
       pages: ['game'],
       enabledByDefault: false,
       order: 40,
-      warning: '«Вся строка погоды» прячет ещё и «Моё местонахождение» — оно в той же строке.',
+      warning: IS_LU ? null : '«Вся строка погоды» прячет ещё и «Моё местонахождение» — оно в той же строке.',
 
       defaults: {
         sky: true,
@@ -5109,7 +5267,11 @@
         wholeRow: false,
       },
 
-      schema: [
+      schema: IS_LU ? [
+        { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
+        { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
+        { key: 'season', type: 'boolean', label: 'Иконка сезона' },
+      ] : [
         { key: 'sky', type: 'boolean', label: 'Небо над полем' },
         { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
         { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
@@ -5207,6 +5369,9 @@
      * дублируя более надёжным $watch по стейту, если Vue доступен.
      */
 
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
     var dom = require('core/dom');
 
     module.exports = {
@@ -5224,7 +5389,7 @@
         smooth: false,
       },
 
-      schema: [
+      schema: IS_LU ? [] : [
         {
           key: 'respectUserScroll',
           type: 'boolean',
@@ -5674,6 +5839,8 @@
     var audio = require('core/audio');
     var dom = require('core/dom');
 
+    var IS_LU = require('cwb:meta').variant === 'lu';
+
     var PERM_BTN = 'cwb-notify-perm';
 
     module.exports = {
@@ -5693,19 +5860,47 @@
         volume: 0.4,
       },
 
-      schema: [
-        { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
-        { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
-        { key: 'sound', type: 'boolean', label: 'Звук при уведомлении' },
-        { key: 'blinkTitle', type: 'boolean', label: 'Мигать заголовком вкладки' },
-        { key: 'volume', type: 'range', label: 'Громкость звука', min: 0.05, max: 1, step: 0.05 },
-        {
-          key: '_perm',
-          type: 'boolean',
-          label: 'Запросить разрешение браузера',
-          hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
-        },
-      ],
+      schema: IS_LU
+        ? [
+            { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
+            { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
+            { key: 'volume', type: 'range', label: 'Громкость звука', min: 0, max: 1, step: 0.05 },
+            {
+              key: '_testSound',
+              type: 'custom',
+              label: 'Проверить звук',
+              render: function () {
+                return dom.el('button', {
+                  type: 'button',
+                  class: 'cwb-btn',
+                  text: 'Проверить звук',
+                  onclick: function () {
+                    var registry = require('core/registry');
+                    audio.play('pm', registry.settingsOf('notifications').volume);
+                  },
+                });
+              },
+            },
+            {
+              key: '_perm',
+              type: 'boolean',
+              label: 'Запросить разрешение браузера',
+              hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
+            },
+          ]
+        : [
+            { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
+            { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
+            { key: 'sound', type: 'boolean', label: 'Звук при уведомлении' },
+            { key: 'blinkTitle', type: 'boolean', label: 'Мигать заголовком вкладки' },
+            { key: 'volume', type: 'range', label: 'Громкость звука', min: 0.05, max: 1, step: 0.05 },
+            {
+              key: '_perm',
+              type: 'boolean',
+              label: 'Запросить разрешение браузера',
+              hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
+            },
+          ],
 
       init: function (ctx) {
         var origTitle = document.title;
@@ -5731,8 +5926,12 @@
         }
 
         function notify(title, body, kind) {
-          if (ctx.settings.get('sound')) audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
-          blink(title);
+          if (IS_LU) {
+            audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
+          } else {
+            if (ctx.settings.get('sound')) audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
+            blink(title);
+          }
           if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
           try {
             var n = new Notification(title, { body: body, tag: 'cwb-' + kind });
@@ -5815,6 +6014,9 @@
      *   custom  — свой JSON {"1": "https://…", "exchange": "https://…"}.
      */
 
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
     var data = require('data/old-icons');
     var dom = require('core/dom');
 
@@ -5851,7 +6053,7 @@
       pages: ['game'],
       enabledByDefault: false,
       order: 20,
-      warning: 'Встроенный список неполный (' + data.count + ' иконок) и тянет картинки с d.zaix.ru. Лучше свой URL или свой словарь.',
+      warning: IS_LU ? 'Иконки грузятся со стороннего хоста d.zaix.ru.' : 'Встроенный список неполный (' + data.count + ' иконок) и тянет картинки с d.zaix.ru. Лучше свой URL или свой словарь.',
 
       defaults: {
         source: 'builtin',     // builtin | base | custom
@@ -5860,7 +6062,7 @@
         includeExtra: true,
       },
 
-      schema: [
+      schema: IS_LU ? [] : [
         {
           key: 'source',
           type: 'select',
@@ -6422,6 +6624,9 @@
      * опция: помечаем такие stylesheet-ы disabled и возвращаем обратно в destroy.
      */
 
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
     var dom = require('core/dom');
 
     function backgroundValue(s) {
@@ -6448,7 +6653,19 @@
         disableSeasonalCss: false,
       },
 
-      schema: [
+      schema: IS_LU ? [
+        {
+          key: 'mode',
+          type: 'select',
+          label: 'Чем заменить',
+          options: [
+            { value: 'color', label: 'Сплошной цвет' },
+            { value: 'image', label: 'Картинка по ссылке' },
+          ],
+        },
+        { key: 'color', type: 'color', label: 'Цвет' },
+        { key: 'imageUrl', type: 'text', label: 'Ссылка на картинку', placeholder: 'https://…/bg.png' },
+      ] : [
         {
           key: 'target',
           type: 'select',

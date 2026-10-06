@@ -2,9 +2,9 @@
 // @name         CatWar Balconette — ЛУ
 // @name:ru      CatWar Balconette — ЛУ
 // @namespace    catwar-balconette-lu
-// @version      0.1.7
-// @description  Только поле для лазательных умений (минное поле, кач ЛУ, импорт и живая запись в UwU).
-// @description:ru Только поле для лазательных умений (минное поле, кач ЛУ, импорт и живая запись в UwU).
+// @version      0.2.0
+// @description  Поле для лазательных умений и подборка модов balconette: координаты клеток, кот ↔ действия, старые иконки, автопрокрутка, ID в ЛС, уведомления, редиректы, статичный фон, погода.
+// @description:ru Поле для лазательных умений и подборка модов balconette: координаты клеток, кот ↔ действия, старые иконки, автопрокрутка, ID в ЛС, уведомления, редиректы, статичный фон, погода.
 // @author       balconette
 // @license      MIT
 // @homepageURL  https://cw-mod.github.io/balconette-mode/
@@ -30,9 +30,9 @@
 (function () {
   'use strict';
 
-  var CWB_VERSION = "0.1.7";
+  var CWB_VERSION = "0.2.0";
   var CWB_VARIANT = "lu";
-  var CWB_MODULE_IDS = ["climbing-field"];
+  var CWB_MODULE_IDS = ["cell-coords","climbing-field","domain-redirect-reverse","domain-redirect","hide-weather","history-autoscroll","layout-swap","notifications","old-icons","pm-ids","static-background"];
 
   var __factories = Object.create(null);
   var __cache = Object.create(null);
@@ -1410,6 +1410,7 @@
     var config = require('core/config');
     var uwu = require('core/uwu');
     var meta = require('cwb:meta');
+    var IS_LU = meta.variant === 'lu';
 
     var ROOT_ID = 'cwb-root';
     var STYLE_ID = 'core-ui';
@@ -1516,6 +1517,7 @@
         '.cwb-opt input[type=range]{width:150px;}',
         '.cwb-opt-val{font-size:12px;color:#8a7f70;min-width:34px;}',
         '.cwb-opt-full{flex-direction:column;align-items:stretch;}',
+        '.cwb-opt-full .cwb-opt-label{flex:0 0 auto;}',
 
         '.cwb-maps-editor{display:flex;flex-direction:column;gap:8px;width:100%;}',
         '.cwb-maps-editor h4{margin:4px 0 0;font-size:12px;}',
@@ -1649,14 +1651,16 @@
             registry.setSetting(mod.id, item.key, value);
           }));
         });
-        opts.appendChild(dom.el('div', { class: 'cwb-opt' }, [
-          dom.el('button', {
-            class: 'cwb-btn',
-            type: 'button',
-            text: 'Сбросить настройки',
-            onclick: function () { registry.resetSettings(mod.id); render(); },
-          }),
-        ]));
+        if (!IS_LU) {
+          opts.appendChild(dom.el('div', { class: 'cwb-opt' }, [
+            dom.el('button', {
+              class: 'cwb-btn',
+              type: 'button',
+              text: 'Сбросить настройки',
+              onclick: function () { registry.resetSettings(mod.id); render(); },
+            }),
+          ]));
+        }
       }
 
       var sw = dom.el('label', { class: 'cwb-sw' }, [
@@ -1789,10 +1793,10 @@
       var focusHint = captureFocusHint();
       var query = state.query.trim().toLowerCase();
       state.listEl.textContent = '';
-      paintTabs();
+      if (!IS_LU) paintTabs();
 
-      if (!query && state.tab === 'new') state.listEl.appendChild(coreCard());
-      if (!query && state.tab === 'overlay') {
+      if (!query && (IS_LU || state.tab === 'new')) state.listEl.appendChild(coreCard());
+      if (!query && !IS_LU && state.tab === 'overlay') {
         state.listEl.appendChild(dom.el('div', {
           class: 'cwb-uwu-banner',
           text: uwu.present()
@@ -1805,7 +1809,7 @@
       registry.CATEGORIES.forEach(function (cat) {
         var mods = registry.list().filter(function (m) {
           if (m.category !== cat.id || !matchesQuery(m, query)) return false;
-          return query ? true : matchesTab(m, state.tab);
+          return query || IS_LU ? true : matchesTab(m, state.tab);
         });
         if (!mods.length) return;
         shown += mods.length;
@@ -1890,61 +1894,69 @@
       var search = dom.el('input', { class: 'cwb-search', type: 'search', placeholder: 'Поиск по модулям…' });
       search.addEventListener('input', function (e) { state.query = e.target.value; render(); });
 
-      var tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
-      TABS.forEach(function (tab) {
-        var btn = dom.el('button', {
-          class: 'cwb-tab',
-          type: 'button',
-          role: 'tab',
-          'data-cwb-tab': tab.id,
-          'aria-selected': tab.id === state.tab ? 'true' : 'false',
-          text: tab.title,
+      var tabs = null;
+      var tabNote = null;
+      if (!IS_LU) {
+        tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
+        TABS.forEach(function (tab) {
+          var btn = dom.el('button', {
+            class: 'cwb-tab',
+            type: 'button',
+            role: 'tab',
+            'data-cwb-tab': tab.id,
+            'aria-selected': tab.id === state.tab ? 'true' : 'false',
+            text: tab.title,
+          });
+          btn.addEventListener('click', function () {
+            if (state.tab === tab.id) return;
+            state.tab = tab.id;
+            render();
+          });
+          tabs.appendChild(btn);
         });
-        btn.addEventListener('click', function () {
-          if (state.tab === tab.id) return;
-          state.tab = tab.id;
-          render();
-        });
-        tabs.appendChild(btn);
-      });
-      var tabNote = dom.el('div', { class: 'cwb-tab-note' });
+        tabNote = dom.el('div', { class: 'cwb-tab-note' });
+      }
 
       var list = dom.el('div', { class: 'cwb-body' });
 
-      var modal = dom.el('div', { class: 'cwb-modal' }, [
+      var modalChildren = [
         dom.el('div', { class: 'cwb-head' }, [
           dom.el('div', { class: 'cwb-title', text: 'CatWar Balconette' }),
           dom.el('div', { class: 'cwb-ver', text: 'v' + meta.version }),
           search,
           dom.el('button', { class: 'cwb-x', type: 'button', title: 'Закрыть', text: '×', onclick: close }),
         ]),
-        tabs,
-        tabNote,
-        list,
-        dom.el('div', { class: 'cwb-foot' }, [
-          dom.el('button', {
-            class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
-            onclick: function () {
-              try { storage.exportToFile(); toast('Настройки сохранены'); }
-              catch (e) { log.error(e); toast('Не получилось сохранить настройки'); }
-            },
-          }),
-          dom.el('button', {
-            class: 'cwb-btn', type: 'button', text: 'Импорт настроек',
-            onclick: function () {
-              storage.importFromFile().then(function (count) {
-                if (!count) return;
-                toast('Загружено: ' + count + '. Перезагрузи страницу.');
-                render();
-              }).catch(function (e) {
-                log.error(e);
-                toast('Файл не подошёл: ' + e.message);
-              });
-            },
-          }),
-          dom.el('div', { class: 'cwb-foot-note', text: 'Хранилище: ' + storage.backend }),
-        ]),
-      ]);
+      ];
+      if (tabs) {
+        modalChildren.push(tabs);
+        modalChildren.push(tabNote);
+      }
+      modalChildren.push(list);
+      modalChildren.push(dom.el('div', { class: 'cwb-foot' }, [
+        dom.el('button', {
+          class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
+          onclick: function () {
+            try { storage.exportToFile(); toast('Настройки сохранены'); }
+            catch (e) { log.error(e); toast('Не получилось сохранить настройки'); }
+          },
+        }),
+        dom.el('button', {
+          class: 'cwb-btn', type: 'button', text: 'Импорт настроек',
+          onclick: function () {
+            storage.importFromFile().then(function (count) {
+              if (!count) return;
+              toast('Загружено: ' + count + '. Перезагрузи страницу.');
+              render();
+            }).catch(function (e) {
+              log.error(e);
+              toast('Файл не подошёл: ' + e.message);
+            });
+          },
+        }),
+        dom.el('div', { class: 'cwb-foot-note', text: 'Хранилище: ' + storage.backend }),
+      ]));
+
+      var modal = dom.el('div', { class: 'cwb-modal' }, modalChildren);
 
       var overlay = dom.el('div', { class: 'cwb-overlay', hidden: true }, [modal]);
       overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) close(); });
@@ -1974,8 +1986,8 @@
         }
       }, true));
 
-      // Панель живёт рядом с реестром: любое изменение — перерисовка.
-      state.offRegistry = registry.onChange(function () { if (state.open) render(); });
+      // Панель живёт рядом с реестром: перерисовка только при вкл/выкл модуля.
+      state.offRegistry = registry.onChange(function (id, kind) { if (state.open && kind === 'enabled') render(); });
       config.onChange(applyCoreSettings);
 
       applyCoreSettings();
@@ -2686,6 +2698,181 @@
   });
 
   /* ====================================================================== */
+  /* src/data/old-icons.js */
+  __def("data/old-icons", function (require, module, exports) {
+    /**
+     * Словарь замен «старых иконок действий».
+     *
+     * ИСТОЧНИК: CW Shed 1.54, правило `on_css_oldicons`
+     * (research/mods/CW_Shed.user.js, строки 2618–2641).
+     *
+     * ВАЖНО, ЧЕГО ЗДЕСЬ НЕ ХВАТАЕТ (подробности в SPEC.md, раздел «Открытые вопросы»):
+     *  1. В Shed ссылки были на http://d.zaix.ru/… — это СТОРОННИЙ хостинг и HTTP.
+     *     На https://catwar.su браузер заблокирует такие картинки как mixed content.
+     *     Здесь они переписаны на https, но работоспособность домена не проверялась.
+     *  2. Shed подменял всего 21 иконку из ~53 — это не полный «старый набор»,
+     *     а те, что автору мода не понравились. Каталога «что реально изменилось
+     *     на CDN игры» у нас нет: игровой HAR обрезан на 100 КБ.
+     *  3. Нет соответствия id → название действия, поэтому в панели настроек
+     *     нельзя показать человекочитаемый список.
+     *
+     * Пока пункты 1–3 не закрыты, модуль old-icons выключен по умолчанию и
+     * рассчитан на свой набор картинок (опция «Свой словарь» или базовый URL).
+     */
+
+    var ZAIX = 'https://d.zaix.ru/';
+
+    /** id действия (значение атрибута data-id у a.dey) -> URL картинки. */
+    var ACTIONS = {
+      '1': ZAIX + 'b6pm.png',
+      '3': ZAIX + 'b6pp.png',
+      '4': ZAIX + 'b6pC.png',
+      '5': ZAIX + 'b6pD.png',
+      '6': ZAIX + 'b6pK.png',
+      '8': ZAIX + 'b6pE.png',
+      '9': ZAIX + 'dIZZ.png',
+      '11': ZAIX + 'c8wv.png',
+      '12': ZAIX + 'b6po.png',
+      '13': ZAIX + '3989.png',
+      '14': ZAIX + 'b6pM.png',
+      '17': ZAIX + '3aKJ.png',
+      '18': ZAIX + 'dJ26.png',
+      '19': ZAIX + 'dJ28.png',
+      '24': ZAIX + 'criD.png',
+      '27': ZAIX + 'aWBR.png',
+      '28': ZAIX + 'buJT.png',
+      '29': ZAIX + 'dcu3.png',
+      '51': ZAIX + 'heaT.png',
+      '52': ZAIX + 'heaU.png',
+      '53': ZAIX + 'heaW.png',
+      exchange: ZAIX + 'aRJm.png',
+      flowers: ZAIX + 'aRIh.png',
+    };
+
+    /** Прочие точечные замены: CSS-селектор -> URL. */
+    var EXTRA = {
+      '#dialog > img': ZAIX + 'fpvK.png',
+    };
+
+    module.exports = {
+      source: 'CW Shed 1.54 (on_css_oldicons)',
+      ACTIONS: ACTIONS,
+      EXTRA: EXTRA,
+      /** Сколько иконок покрывает встроенный словарь. */
+      count: Object.keys(ACTIONS).length + Object.keys(EXTRA).length,
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/modules/cell-coords.js */
+  __def("modules/cell-coords", function (require, module, exports) {
+    /**
+     * Координаты клетки при наведении на игровое поле.
+     *
+     * x/y — индексы td/tr в #cages (1-based), как в field.map[y][x].
+     * При нюхе и перерисовке поля оверлей перевешивается по $watch field.map.
+     * См. CORRECTIONS.md и RUNTIME.md §8.10.
+     */
+
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
+    var SEL_TABLE = '#cages';
+    var SEL_CELL = SEL_TABLE + ' td.cage';
+
+    function cellCoords(td) {
+      var tr = td.parentElement;
+      if (!tr || !tr.parentElement) return null;
+      return {
+        y: Array.prototype.indexOf.call(tr.parentElement.children, tr) + 1,
+        x: Array.prototype.indexOf.call(tr.children, td) + 1,
+      };
+    }
+
+    module.exports = {
+      id: 'cell-coords',
+      title: 'Координаты клетки',
+      description: 'Подсказка x,y при наведении на клетку игрового поля.',
+      category: 'field',
+      pages: ['game', 'hunt'],
+      enabledByDefault: false,
+      order: 21,
+
+      defaults: {
+        showTree: true,
+        hideInSmell: true,
+      },
+
+      schema: IS_LU ? [] : [
+        { key: 'showTree', type: 'boolean', label: 'Показывать ярус дерева' },
+        { key: 'hideInSmell', type: 'boolean', label: 'Скрывать в режиме нюха' },
+      ],
+
+      styles: function () {
+        return [
+          SEL_CELL + ' { position: relative; }',
+          SEL_CELL + '[data-cwb-xy]:hover::before {',
+          'content: attr(data-cwb-xy); position: absolute; top: 2px; left: 2px; z-index: 50;',
+          'font: 11px/1 ui-monospace, Menlo, Consolas, monospace;',
+          'background: rgba(0,0,0,.78); color: #fff; padding: 2px 4px; pointer-events: none;',
+          'border-radius: 3px;',
+          '}',
+        ].join('\n');
+      },
+
+      init: function (ctx) {
+        var boundTable = null;
+
+        function labelFor(td) {
+          var c = cellCoords(td);
+          if (!c) return;
+          var map = ctx.vue.get('field.map');
+          var cage = map && map[c.y] && map[c.y][c.x];
+          var text = c.x + ',' + c.y;
+          if (ctx.settings.get('showTree') && cage && typeof cage.tree === 'number') {
+            text += ' · ярус ' + cage.tree;
+          }
+          td.dataset.cwbXy = text;
+        }
+
+        function onOver(e) {
+          var td = e.target.closest && e.target.closest(SEL_CELL);
+          if (!td) return;
+          if (ctx.settings.get('hideInSmell')) {
+            var smell = ctx.vue.get('field.smellMap');
+            if (smell && (typeof smell === 'object' || Array.isArray(smell))) return;
+          }
+          labelFor(td);
+        }
+
+        function bindTable(table) {
+          if (!table || table === boundTable) return;
+          boundTable = table;
+          ctx.on(table, 'mouseover', onOver);
+        }
+
+        function syncTable() {
+          if (ctx.isDisposed()) return;
+          if (ctx.settings.get('hideInSmell')) {
+            var smell = ctx.vue.get('field.smellMap');
+            if (smell && (typeof smell === 'object' || Array.isArray(smell))) return;
+          }
+          var table = ctx.dom.qs(SEL_TABLE);
+          if (table && table.tagName === 'TABLE') bindTable(table);
+        }
+
+        return ctx.dom.waitForElement(SEL_TABLE).then(function () {
+          if (ctx.isDisposed()) return;
+          syncTable();
+          ctx.watch('field.map', syncTable, { deep: true });
+          ctx.watch('field.smellMap', syncTable);
+          ctx.watch('hunt.mode', syncTable);
+        });
+      },
+    };
+  });
+
+  /* ====================================================================== */
   /* src/modules/climbing-field.js */
   __def("modules/climbing-field", function (require, module, exports) {
     /**
@@ -3156,13 +3343,15 @@
       return tds[(y - 1) * COLS + (x - 1)] || null;
     }
 
+    var IS_LU = require('cwb:meta').variant === 'lu';
+
     module.exports = {
       id: 'climbing-field',
       title: 'Поле для ЛУ',
       description: 'Минное поле 10×6: вкладки, локации, цифры треска, мины и переходы. Карты не слетают после обновления.',
       category: 'field',
       pages: ['game'],
-      enabledByDefault: require('cwb:meta').variant === 'lu',
+      enabledByDefault: IS_LU,
       order: 25,
 
       defaults: {
@@ -3178,7 +3367,27 @@
         clearOnLocation: false,
       },
 
-      schema: [
+      schema: IS_LU ? [
+        {
+          key: 'blockDangerous',
+          type: 'boolean',
+          label: 'Кач ЛУ: не нажимать на опасные клетки',
+          hint: 'Не даёт кликнуть и пойти с клавиатуры (WASD, QEZX) на мины, опаски и unsafe. Выключи, если хочешь ходить как обычно.',
+        },
+        {
+          key: 'autoFromChat',
+          type: 'boolean',
+          label: 'Ставить цифру в клетку кота по треску в чате',
+          hint: 'Берёт громкость из [треск] (0–7) и ставит в клетку, где стоит твой кот. Обычные системные реплики не считает.',
+        },
+        {
+          key: 'mapsEditor',
+          type: 'custom',
+          label: 'Вкладки и поля',
+          hint: 'Добавить, удалить или переименовать вкладки и таблицы внутри выбранной вкладки.',
+          render: renderMapsEditor,
+        },
+      ] : [
         {
           key: 'overlay',
           type: 'boolean',
@@ -3283,7 +3492,8 @@
           'z-index:40;font:700 12px/1 ui-monospace,Menlo,Consolas,monospace;padding:1px 3px;border-radius:3px;',
           'background:rgba(0,0,0,.78);color:#ffe9a8;pointer-events:none;}',
           '#cages td.cage[data-cwb-lu="X"]::after{background:rgba(160,0,0,.85);color:#fff;}',
-          '#cages td.cage[data-cwb-lu="="]::after{background:rgba(255,255,255,.75);color:#222;}',
+          '#cwb-lu-overlay{display:flex;align-items:center;gap:5px;margin:0 0 6px;font-size:11px;cursor:pointer;opacity:.9;}',
+          '#cwb-lu-overlay:hover{opacity:1;}',
         ].join('');
       },
 
@@ -3346,12 +3556,19 @@
 
         var tabsEl = dom.el('div', { id: 'cwb-lu-tabs' });
         var fieldsEl = dom.el('div', { id: 'cwb-lu-fields' });
-        var nav = dom.el('div', { id: 'cwb-lu-nav' }, [
-          dom.el('h3', { text: 'Вкладка' }),
-          tabsEl,
-          dom.el('h3', { text: 'Локация' }),
-          fieldsEl,
-        ]);
+        var overlayInput = dom.el('input', { type: 'checkbox', checked: !!ctx.settings.get('overlay') });
+        var overlayLabel = IS_LU ? dom.el('label', {
+          id: 'cwb-lu-overlay',
+          title: 'Дублировать пометки (безопасно/мина/переход) и цифры на клетках игрового поля',
+        }, [overlayInput, document.createTextNode(' Переносить на игровую')]) : null;
+        if (overlayLabel) {
+          overlayLabel.addEventListener('change', function (e) {
+            if (e.target === overlayInput) ctx.settings.set('overlay', e.target.checked);
+          });
+        }
+        var navChildren = [dom.el('h3', { text: 'Вкладка' }), tabsEl, dom.el('h3', { text: 'Локация' }), fieldsEl];
+        if (overlayLabel) navChildren.unshift(overlayLabel);
+        var nav = dom.el('div', { id: 'cwb-lu-nav' }, navChildren);
         var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавь поле или таблицу в настройках' });
         var trainBtn = dom.el('button', {
           type: 'button',
@@ -4073,6 +4290,1065 @@
         var registry = require('core/registry');
         registry.stopModule('climbing-field');
         registry.startModule('climbing-field');
+      },
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/modules/domain-redirect-reverse.js */
+  __def("modules/domain-redirect-reverse", function (require, module, exports) {
+    /**
+     * Редирект и подмена catwar.su → catwar.net.
+     */
+
+    var createRedirectModule;
+    try {
+      // В бандле имена модулей вида 'modules/<id>'.
+      createRedirectModule = require('modules/domain-redirect').createRedirectModule;
+    } catch (e) {
+      // В чистом Node (юнит-тесты) работает только относительный путь.
+      createRedirectModule = require('./domain-redirect').createRedirectModule;
+    }
+
+    var mod = createRedirectModule({
+      id: 'domain-redirect-reverse',
+      title: 'Редирект catwar.su → .net',
+      description: 'Кидает с catwar.su на catwar.net и чинит ссылки, картинки и запросы.',
+      category: 'misc',
+      pages: ['*'],
+      early: true,
+      enabledByDefault: false,
+      order: 6,
+      compat: 'new',
+
+      fromPrefixes: ['https://catwar.su', 'http://catwar.su', '//catwar.su'],
+      toOrigin: 'https://catwar.net',
+      hostRe: /(^|\.)catwar\.su$/i,
+
+      defaults: {
+        redirectPage: true,
+        rewriteDom: true,
+        interceptNetwork: true,
+      },
+
+      schema: [],
+    });
+
+    var origInit = mod.init;
+    mod.init = function (ctx) {
+      var registry;
+      try { registry = require('core/registry'); } catch (e) {}
+      if (registry && typeof registry.isEnabled === 'function' && registry.isEnabled('domain-redirect')) {
+        ctx.log.warn('domain-redirect-reverse не применён: domain-redirect уже включён.');
+        return;
+      }
+      origInit(ctx);
+    };
+
+    module.exports = mod;
+  });
+
+  /* ====================================================================== */
+  /* src/modules/domain-redirect.js */
+  __def("modules/domain-redirect", function (require, module, exports) {
+    /**
+     * Редирект и подмена домена.
+     *
+     * Поведение по мотивам userscript «Перенаправление ссылок CatWar»
+     * https://github.com/cat-be/catwar-domain-redirect (автор 1080554, v1.1).
+     * Отдельной лицензии в том репозитории нет; копируем идею, не хедер.
+     *
+     * Ничего не шлёт на сервер само: только подменяет адрес в уже идущих
+     * переходах, ссылках и запросах. На живую игру вторую вкладку не открывает.
+     */
+
+    function createRedirectModule(opts) {
+      var fromPrefixes = opts.fromPrefixes;
+      var toOrigin = opts.toOrigin;
+      var hostRe = opts.hostRe;
+
+      function replaceDomain(url) {
+        if (!url || typeof url !== 'string') return url;
+        for (var i = 0; i < fromPrefixes.length; i++) {
+          var p = fromPrefixes[i];
+          if (url.indexOf(p) === 0) return toOrigin + url.slice(p.length);
+        }
+        return url;
+      }
+
+      function rewriteText(text) {
+        if (!text || typeof text !== 'string') return text;
+        var result = text;
+        for (var i = 0; i < fromPrefixes.length; i++) {
+          var p = fromPrefixes[i];
+          var repl = (p.slice(0, 2) === '//' && p.indexOf('://') === -1)
+            ? '//' + toOrigin.replace(/^https?:\/\//, '')
+            : toOrigin;
+          result = result.split(p).join(repl);
+        }
+        return result;
+      }
+
+      function rewriteSrcset(value) {
+        if (!value || typeof value !== 'string') return value;
+        return value.split(',').map(function (part) {
+          var trimmed = part.trim();
+          var i = trimmed.indexOf(' ');
+          if (i === -1) return replaceDomain(trimmed);
+          return replaceDomain(trimmed.slice(0, i)) + trimmed.slice(i);
+        }).join(', ');
+      }
+
+      /** Куда увести открытую страницу. Иначе null. */
+      function redirectTarget(href) {
+        if (!href || typeof href !== 'string') return null;
+        for (var i = 0; i < fromPrefixes.length; i++) {
+          var p = fromPrefixes[i];
+          if (href.indexOf(p) === 0) return toOrigin + href.slice(p.length);
+        }
+        try {
+          var url = new URL(href);
+          if (!hostRe.test(url.hostname)) return null;
+          return toOrigin + url.pathname + url.search + url.hash;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function rewriteResource(resource) {
+        if (typeof resource === 'string') return replaceDomain(resource);
+        if (resource && typeof Request === 'function' && resource instanceof Request) {
+          var next = replaceDomain(resource.url);
+          if (next === resource.url) return resource;
+          try { return new Request(next, resource); } catch (e) { return resource; }
+        }
+        return resource;
+      }
+
+      function processElement(el) {
+        if (!el || el.nodeType !== 1 || !el.hasAttribute) return;
+
+        ['href', 'src', 'poster'].forEach(function (attr) {
+          if (!el.hasAttribute(attr)) return;
+          var oldVal = el.getAttribute(attr);
+          var newVal = replaceDomain(oldVal);
+          if (newVal !== oldVal) el.setAttribute(attr, newVal);
+        });
+
+        if (el.hasAttribute('srcset')) {
+          var oldSrcset = el.getAttribute('srcset');
+          var newSrcset = rewriteSrcset(oldSrcset);
+          if (newSrcset !== oldSrcset) el.setAttribute('srcset', newSrcset);
+        }
+
+        if (el.hasAttribute('style')) {
+          var oldStyle = el.getAttribute('style');
+          var newStyle = rewriteText(oldStyle);
+          if (newStyle !== oldStyle) el.setAttribute('style', newStyle);
+        }
+      }
+
+      function processAll(root) {
+        if (!root) root = document;
+        if (!root.querySelectorAll) return;
+        var nodes = root.querySelectorAll('[href], [src], [poster], [srcset], [style]');
+        for (var i = 0; i < nodes.length; i++) processElement(nodes[i]);
+      }
+
+      function applySettings(ctx) {
+        var target = redirectTarget(location.href);
+        if (target && ctx.settings.get('redirectPage')) {
+          try { location.replace(target); } catch (e) { ctx.log.warn('не удалось перенаправить', e); }
+          return;
+        }
+
+        if (ctx.settings.get('rewriteDom')) {
+          processAll(document);
+          ctx.on(document, 'DOMContentLoaded', function () { processAll(document); });
+          ctx.on(document, 'click', function (e) {
+            var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+            if (!link) return;
+            var oldHref = link.getAttribute('href');
+            var newHref = replaceDomain(oldHref);
+            if (newHref !== oldHref) link.setAttribute('href', newHref);
+          }, true);
+
+          var originalOpen = window.open;
+          window.open = function (url) {
+            var next = replaceDomain(url);
+            var args = [next].concat([].slice.call(arguments, 1));
+            if (typeof originalOpen === 'function') return originalOpen.apply(this, args);
+            return null;
+          };
+          ctx.addCleanup(function () { window.open = originalOpen; });
+
+          var root = document.documentElement || document;
+          ctx.observe(root, function (mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+              var mutation = mutations[i];
+              if (mutation.type === 'attributes') processElement(mutation.target);
+              var nodes = mutation.addedNodes;
+              for (var j = 0; j < nodes.length; j++) {
+                var node = nodes[j];
+                if (!node || node.nodeType !== 1) continue;
+                processElement(node);
+                processAll(node);
+              }
+            }
+          }, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['href', 'src', 'poster', 'srcset', 'style'],
+          });
+        }
+
+        if (ctx.settings.get('interceptNetwork')) {
+          if (typeof window.fetch === 'function') {
+            var originalFetch = window.fetch;
+            window.fetch = function (resource, init) {
+              return originalFetch.call(this, rewriteResource(resource), init);
+            };
+            ctx.addCleanup(function () { window.fetch = originalFetch; });
+          }
+
+          if (typeof XMLHttpRequest === 'function' && XMLHttpRequest.prototype) {
+            var originalXhrOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function (method, url) {
+              var args = [method, replaceDomain(url)].concat([].slice.call(arguments, 2));
+              return originalXhrOpen.apply(this, args);
+            };
+            ctx.addCleanup(function () { XMLHttpRequest.prototype.open = originalXhrOpen; });
+          }
+        }
+      }
+
+      var mod = {
+        id: opts.id,
+        title: opts.title,
+        description: opts.description,
+        category: opts.category,
+        pages: opts.pages,
+        early: opts.early,
+        enabledByDefault: opts.enabledByDefault,
+        order: opts.order,
+        compat: opts.compat,
+
+        defaults: opts.defaults,
+
+        schema: opts.schema,
+
+        init: function (ctx) {
+          if (opts.init) {
+            var result = opts.init(ctx);
+            if (result === false) return;
+          }
+          applySettings(ctx);
+        },
+      };
+
+      mod.replaceDomain = replaceDomain;
+      mod.redirectTarget = redirectTarget;
+      mod.rewriteSrcset = rewriteSrcset;
+      mod.rewriteText = rewriteText;
+      mod.rewriteResource = rewriteResource;
+      mod.processElement = processElement;
+
+      return mod;
+    }
+
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
+    var mod = createRedirectModule({
+      id: 'domain-redirect',
+      title: 'Редирект catwar.net → .su',
+      description: 'Кидает с catwar.net на catwar.su и чинит ссылки, картинки и запросы. По умолчанию включён.',
+      category: 'misc',
+      pages: ['*'],
+      early: true,
+      enabledByDefault: true,
+      order: 5,
+      compat: 'new',
+
+      fromPrefixes: ['https://catwar.net', 'http://catwar.net', '//catwar.net'],
+      toOrigin: 'https://catwar.su',
+      hostRe: /(^|\.)catwar\.net$/i,
+
+      defaults: {
+        redirectPage: true,
+        rewriteDom: true,
+        interceptNetwork: true,
+      },
+
+      schema: IS_LU ? [] : [
+        {
+          key: 'redirectPage',
+          type: 'boolean',
+          label: 'Перенаправлять открытие catwar.net',
+          hint: 'Если вкладка открылась на catwar.net — кинет на тот же путь на .su.',
+        },
+        {
+          key: 'rewriteDom',
+          type: 'boolean',
+          label: 'Подменять .net в ссылках и картинках',
+          hint: 'Ссылки, картинки, клики и window.open.',
+        },
+        {
+          key: 'interceptNetwork',
+          type: 'boolean',
+          label: 'Подменять .net в fetch и XHR',
+          hint: 'Свои запросы не шлёт, только правит адрес у тех, что уже идут.',
+        },
+      ],
+    });
+
+    /* Если работает обратный редирект (su → .net), а включили нас (net → .su) —
+       останавливаем его: работают оба = бесконечный ping-pong редиректов.
+       Обратный порядок (включили reverse при работающем нами) закрыт в его init. */
+    var origInit = mod.init;
+    mod.init = function (ctx) {
+      try {
+        var registry = require('core/registry');
+        if (registry && typeof registry.isRunning === 'function' && registry.isRunning('domain-redirect-reverse')) {
+          registry.setEnabled('domain-redirect-reverse', false);
+          ctx.log.warn('обратный редирект (su → .net) выключен: работает net → .su');
+        }
+      } catch (e) { /* реестр недоступен (юнит-тесты в Node) — пропускаем */ }
+      origInit(ctx);
+    };
+
+    module.exports = mod;
+    module.exports.createRedirectModule = createRedirectModule;
+  });
+
+  /* ====================================================================== */
+  /* src/modules/hide-weather.js */
+  __def("modules/hide-weather", function (require, module, exports) {
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
+    /**
+     * Скрыть погоду.
+     *
+     * Разные узлы отвечают за разное, поэтому опции раздельные:
+     *   #tr_sky  — строка таблицы с картинкой неба (внутри #sky, 150px высотой);
+     *   #tos     — градиентная полоска температуры (инлайновый linear-gradient);
+     *   #hour    — <a id="hour"> со ссылкой на /time и картинкой symbole/hours/N.png;
+     *   сезон    — ещё одна <a href=".../time"> с картинкой symbole/seasonN.png,
+     *              своего id у неё нет — цепляемся за путь к картинке;
+     *   #tr_tos  — вся строка целиком. Внутри неё лежит .game-location
+     *              («Моё местонахождение»), поэтому «скрыть всю строку» вынесено
+     *              отдельно и с предупреждением.
+     *
+     * Разметка сверена с сохранённым HTML игровой страницы.
+     */
+
+    module.exports = {
+      id: 'hide-weather',
+      title: 'Убрать погоду',
+      description: 'Прячет небо, температуру, час и сезон над полем.',
+      category: 'field',
+      pages: ['game'],
+      enabledByDefault: false,
+      order: 40,
+      warning: IS_LU ? null : '«Вся строка погоды» прячет ещё и «Моё местонахождение» — оно в той же строке.',
+
+      defaults: {
+        sky: true,
+        tos: true,
+        hour: false,
+        season: false,
+        wholeRow: false,
+      },
+
+      schema: IS_LU ? [
+        { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
+        { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
+        { key: 'season', type: 'boolean', label: 'Иконка сезона' },
+      ] : [
+        { key: 'sky', type: 'boolean', label: 'Небо над полем' },
+        { key: 'tos', type: 'boolean', label: 'Полоска температуры' },
+        { key: 'hour', type: 'boolean', label: 'Иконка игрового часа' },
+        { key: 'season', type: 'boolean', label: 'Иконка сезона' },
+        {
+          key: 'wholeRow',
+          type: 'boolean',
+          label: 'Вся строка погоды',
+          hint: 'Перебивает галочки выше. В компакте ещё спрячет название локации.',
+        },
+      ],
+
+      styles: function (s) {
+        var css = [];
+        if (s.wholeRow) {
+          css.push('#tr_tos { display: none !important; }');
+        } else {
+          if (s.tos) css.push('#tos { display: none !important; }');
+          if (s.hour) css.push('#hour { display: none !important; }');
+          // У иконки сезона нет своего id — цепляемся за имя файла symbole/seasonN.png.
+          if (s.season) css.push('#tr_tos img[src*="season"] { display: none !important; }');
+        }
+        if (s.sky && !require('core/uwu').hidingSky()) {
+          css.push('#tr_sky { display: none !important; }');
+          // На случай, если compact уже вынес #sky из таблицы.
+          css.push('#sky { display: none !important; }');
+        }
+        return css.join('\n');
+      },
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/modules/history-autoscroll.js */
+  __def("modules/history-autoscroll", function (require, module, exports) {
+    /**
+     * Автопрокрутка истории.
+     *
+     * История — #ist внутри #history_block. В обычном режиме прокручивается сама
+     * страница, в compact — #history_block (у него overflow-y:auto). Поэтому цель
+     * прокрутки ищем динамически: ближайший прокручиваемый предок #ist.
+     *
+     * Текст истории дописывается строкой в cat.history, Vue перерисовывает #ist —
+     * ловим это MutationObserver-ом на контейнере (childList + characterData),
+     * дублируя более надёжным $watch по стейту, если Vue доступен.
+     */
+
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
+    var dom = require('core/dom');
+
+    module.exports = {
+      id: 'history-autoscroll',
+      title: 'Автопрокрутка истории',
+      description: 'Держит историю прокрученной к последней записи.',
+      category: 'info',
+      pages: ['game'],
+      enabledByDefault: false,
+      order: 10,
+
+      defaults: {
+        respectUserScroll: true,
+        threshold: 60,
+        smooth: false,
+      },
+
+      schema: IS_LU ? [] : [
+        {
+          key: 'respectUserScroll',
+          type: 'boolean',
+          label: 'Не мешать, если прокрутил вверх',
+          hint: 'Автопрокрутка вернётся, как только снова окажешься внизу.',
+        },
+        { key: 'threshold', type: 'number', label: 'Зона «у низа», px', min: 0, max: 600, step: 10 },
+        { key: 'smooth', type: 'boolean', label: 'Плавная прокрутка' },
+      ],
+
+      init: function (ctx) {
+        var target = null;   // прокручиваемый контейнер
+        var ist = null;
+        var stick = true;    // пользователь «прилип» к низу
+        var offScroll = null;
+        var offObserve = null;
+
+        function atBottom(el) {
+          var gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+          return gap <= Math.max(0, Number(ctx.settings.get('threshold')) || 0);
+        }
+
+        function scrollToBottom() {
+          if (!target) return;
+          if (ctx.settings.get('respectUserScroll') && !stick) return;
+          var top = target.scrollHeight;
+          if (ctx.settings.get('smooth') && typeof target.scrollTo === 'function') {
+            target.scrollTo({ top: top, behavior: 'smooth' });
+          } else {
+            target.scrollTop = top;
+          }
+        }
+
+        function bindScrollTarget() {
+          if (offScroll) { offScroll(); offScroll = null; }
+          target = dom.scrollParent(ist);
+          // scrollParent может вернуть documentElement — слушать надо тогда window.
+          var listenOn = (target === document.documentElement || target === document.body ||
+            target === document.scrollingElement) ? window : target;
+          stick = true;
+          offScroll = ctx.addCleanup(dom.on(listenOn, 'scroll', function () {
+            if (!target) return;
+            stick = atBottom(target === document.scrollingElement ? document.scrollingElement : target);
+          }, { passive: true }));
+        }
+
+        function attach(node) {
+          ist = node;
+          bindScrollTarget();
+          if (offObserve) offObserve();
+          offObserve = ctx.observe(ist, function () {
+            // Если Vue пересоздал #ist, перецепляемся.
+            if (!document.contains(ist)) { rediscover(); return; }
+            scrollToBottom();
+          }, { childList: true, subtree: true, characterData: true });
+          scrollToBottom();
+          ctx.log.debug('история найдена, цель прокрутки:', target && target.id);
+        }
+
+        function rediscover() {
+          if (ctx.isDisposed()) return;
+          dom.waitForElement('#ist', { timeout: 20000 }).then(function (node) {
+            if (!node || ctx.isDisposed()) return;
+            attach(node);
+          });
+        }
+
+        rediscover();
+
+        // Дублирующий сигнал из стейта: история в игре — одна растущая строка.
+        ctx.watch('cat.history', function () {
+          // Ждём, пока Vue домалюет DOM.
+          requestAnimationFrame(scrollToBottom);
+        });
+      },
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/modules/layout-swap.js */
+  __def("modules/layout-swap", function (require, module, exports) {
+    /**
+     * Поменять местами выбор кота (#mit) и иконки действий (#akten).
+     *
+     * Основной сценарий — компактный режим (3 колонки): #block_deys — flex-колонка
+     * с #deys и #deys_mit. Перестановка через CSS order + data-атрибут, без
+     * переноса узлов. Если структура иная — модуль молча не применяется.
+     *
+     * Эталоны разметки:
+     *   компакт — «Игровая _ CatWar компактный режим 3 колонки.html»;
+     *   обычный — «Игровая _ CatWar обычный режим не компактный.html».
+     */
+
+    var BLOCK = '#block_deys';
+    var MARKER = 'cwb-layout-swap';
+
+    module.exports = {
+      id: 'layout-swap',
+      title: 'Поменять кот ↔ действия',
+      description: 'Сначала выбор соседнего кота, потом иконки действий.',
+      category: 'interface',
+      pages: ['game'],
+      enabledByDefault: false,
+      order: 15,
+
+      styles: function () {
+        var sel = BLOCK + '[data-' + MARKER + ']';
+        return [
+          /* Компакт: колонка, mit сверху */
+          '#app.compact ' + sel + ' { display: flex; flex-direction: column; }',
+          '#app.compact ' + sel + ' #deys_mit { order: 1; margin-top: 0; }',
+          '#app.compact ' + sel + ' #deys { order: 2; margin-top: 8px; }',
+          /* Обычный / широкий: строка, mit слева */
+          '#app:not(.compact) ' + sel + ':not(.mobile) { display: flex; flex-direction: row; }',
+          '#app:not(.compact) ' + sel + ':not(.mobile) #deys_mit { order: 1; margin-left: 0; margin-right: 5px; }',
+          '#app:not(.compact) ' + sel + ':not(.mobile) #deys { order: 2; }',
+          /* Мобильная колонка игры */
+          sel + '.mobile #deys_mit { order: 1; }',
+          sel + '.mobile #deys { order: 2; }',
+        ].join('\n');
+      },
+
+      init: function (ctx) {
+        return ctx.dom.waitForElement(BLOCK).then(function (block) {
+          if (!block || ctx.isDisposed()) return;
+          var deys = block.querySelector('#deys');
+          var mitWrap = block.querySelector('#deys_mit');
+          var mit = block.querySelector('#mit');
+          var akten = block.querySelector('#akten');
+          // Без обоих блоков или ключевых узлов — не ломаем вёрстку.
+          if (!deys || !mitWrap || !mit || !akten) {
+            ctx.log.debug('layout-swap: структура не узнана, пропуск');
+            return;
+          }
+          block.setAttribute('data-' + MARKER, '1');
+          ctx.addCleanup(function () { block.removeAttribute('data-' + MARKER); });
+        });
+      },
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/modules/notifications.js */
+  __def("modules/notifications", function (require, module, exports) {
+    /**
+     * Уведомления о новом ЛС и упоминании в чате.
+     *
+     * Browser Notification (разрешение — по кнопке в настройках), опционально звук
+     * и мигание заголовка вкладки. Чат-DOM не трогаем — читаем Vue.
+     * См. RUNTIME.md §8.12.
+     */
+
+    var audio = require('core/audio');
+    var dom = require('core/dom');
+
+    var IS_LU = require('cwb:meta').variant === 'lu';
+
+    var PERM_BTN = 'cwb-notify-perm';
+
+    module.exports = {
+      id: 'notifications',
+      title: 'Уведомления',
+      description: 'Уведомления браузера про новое ЛС и упоминание в чате.',
+      category: 'chat',
+      pages: ['game', 'chat'],
+      enabledByDefault: false,
+      order: 10,
+
+      defaults: {
+        onPm: true,
+        onMention: true,
+        sound: true,
+        blinkTitle: true,
+        volume: 0.4,
+      },
+
+      schema: IS_LU
+        ? [
+            { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
+            { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
+            { key: 'volume', type: 'range', label: 'Громкость звука', min: 0, max: 1, step: 0.05 },
+            {
+              key: '_testSound',
+              type: 'custom',
+              label: 'Проверить звук',
+              render: function () {
+                return dom.el('button', {
+                  type: 'button',
+                  class: 'cwb-btn',
+                  text: 'Проверить звук',
+                  onclick: function () {
+                    var registry = require('core/registry');
+                    audio.play('pm', registry.settingsOf('notifications').volume);
+                  },
+                });
+              },
+            },
+            {
+              key: '_perm',
+              type: 'boolean',
+              label: 'Запросить разрешение браузера',
+              hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
+            },
+          ]
+        : [
+            { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
+            { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
+            { key: 'sound', type: 'boolean', label: 'Звук при уведомлении' },
+            { key: 'blinkTitle', type: 'boolean', label: 'Мигать заголовком вкладки' },
+            { key: 'volume', type: 'range', label: 'Громкость звука', min: 0.05, max: 1, step: 0.05 },
+            {
+              key: '_perm',
+              type: 'boolean',
+              label: 'Запросить разрешение браузера',
+              hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
+            },
+          ],
+
+      init: function (ctx) {
+        var origTitle = document.title;
+        var blinkTimer = null;
+        var blinkOn = false;
+
+        function stopBlink() {
+          clearInterval(blinkTimer);
+          blinkTimer = null;
+          document.title = origTitle;
+          blinkOn = false;
+        }
+
+        function blink(title) {
+          if (!ctx.settings.get('blinkTitle')) return;
+          stopBlink();
+          var alt = '● ' + title;
+          blinkTimer = ctx.interval(function () {
+            document.title = blinkOn ? origTitle : alt;
+            blinkOn = !blinkOn;
+          }, 900);
+          ctx.on(window, 'focus', stopBlink);
+        }
+
+        function notify(title, body, kind) {
+          if (IS_LU) {
+            audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
+          } else {
+            if (ctx.settings.get('sound')) audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
+            blink(title);
+          }
+          if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+          try {
+            var n = new Notification(title, { body: body, tag: 'cwb-' + kind });
+            n.onclick = function () { window.focus(); n.close(); };
+          } catch (e) { ctx.log.warn('Notification API', e); }
+        }
+
+        // Кнопка разрешения — через одноразовый обработчик настройки _perm
+        if (ctx.settings.get('_perm') && typeof Notification !== 'undefined' &&
+            Notification.permission === 'default') {
+          Notification.requestPermission().finally(function () {
+            ctx.settings.set('_perm', false);
+          });
+        }
+
+        return ctx.whenVueReady().then(function (vm) {
+          if (!vm || ctx.isDisposed()) return;
+          origTitle = document.title;
+
+          if (ctx.settings.get('onPm')) {
+            ctx.watch('game.notReadMess', function (now, was) {
+              if (typeof now === 'number' && typeof was === 'number' && now > was) {
+                notify('Новое личное сообщение', 'Непрочитанных: ' + now, 'pm');
+              }
+            });
+          }
+
+          if (ctx.settings.get('onMention')) {
+            ctx.vue.onChatMessage(function (fresh) {
+              var myId = ctx.vue.get('cat.id');
+              fresh.forEach(function (msg) {
+                if (!msg || msg.cat === myId) return;
+                if (/class=["']myname["']/.test(String(msg.text || ''))) {
+                  var plain = String(msg.text || '').replace(/<[^>]+>/g, '');
+                  notify((msg.login || 'Чат') + ' упомянул(а) тебя', plain, 'mention');
+                }
+              });
+            });
+          }
+        });
+      },
+
+      destroy: function () {
+        if (typeof document !== 'undefined') document.title = document.title.replace(/^●\s*/, '');
+      },
+
+      onSettings: function (ctx, key) {
+        if (key === '_perm') {
+          if (ctx.settings.get('_perm') && typeof Notification !== 'undefined') {
+            Notification.requestPermission().finally(function () {
+              ctx.settings.set('_perm', false);
+            });
+          }
+          return;
+        }
+        var registry = require('core/registry');
+        registry.stopModule('notifications');
+        registry.startModule('notifications');
+      },
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/modules/old-icons.js */
+  __def("modules/old-icons", function (require, module, exports) {
+    /**
+     * Старые иконки действий.
+     *
+     * КАРКАС: логика подмены готова и работает, но встроенный словарь неполный и
+     * ссылается на сторонний хостинг (см. комментарий в src/data/old-icons.js и
+     * раздел «Открытые вопросы» в SPEC.md). Поэтому модуль выключен по умолчанию.
+     *
+     * Разметка действий: #deys > #akten > a.dey[data-id="{id}"] > img[src="actions/{id}.png"].
+     * Подменяем через `content: url(...)` на <img> — так делал CW Shed; размер
+     * иконки сохраняется, DOM не трогаем.
+     *
+     * Три режима источника картинок:
+     *   builtin — словарь из src/data/old-icons.js;
+     *   base    — свой базовый URL: {base}/{id}.png для всех известных id;
+     *   custom  — свой JSON {"1": "https://…", "exchange": "https://…"}.
+     */
+
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
+    var data = require('data/old-icons');
+    var dom = require('core/dom');
+
+    function parseCustom(raw, log) {
+      if (!String(raw || '').trim()) return {};
+      try {
+        var parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch (e) {
+        if (log) log.warn('свой словарь иконок — не JSON', e);
+        return {};
+      }
+    }
+
+    function buildMap(s, log) {
+      if (s.source === 'custom') return parseCustom(s.customMap, log);
+
+      if (s.source === 'base') {
+        var base = String(s.baseUrl || '').trim().replace(/\/+$/, '');
+        if (!base) return {};
+        var out = {};
+        Object.keys(data.ACTIONS).forEach(function (id) { out[id] = base + '/' + id + '.png'; });
+        return out;
+      }
+
+      return Object.assign({}, data.ACTIONS);
+    }
+
+    module.exports = {
+      id: 'old-icons',
+      title: 'Старые иконки действий',
+      description: 'Ставит старые картинки на кнопки действий.',
+      category: 'interface',
+      pages: ['game'],
+      enabledByDefault: false,
+      order: 20,
+      warning: IS_LU ? 'Иконки грузятся со стороннего хоста d.zaix.ru.' : 'Встроенный список неполный (' + data.count + ' иконок) и тянет картинки с d.zaix.ru. Лучше свой URL или свой словарь.',
+
+      defaults: {
+        source: 'builtin',     // builtin | base | custom
+        baseUrl: '',
+        customMap: '',
+        includeExtra: true,
+      },
+
+      schema: IS_LU ? [] : [
+        {
+          key: 'source',
+          type: 'select',
+          label: 'Откуда брать картинки',
+          options: [
+            { value: 'builtin', label: 'Встроенный словарь (из CW Shed)' },
+            { value: 'base', label: 'Свой базовый URL: {base}/{id}.png' },
+            { value: 'custom', label: 'Свой словарь JSON' },
+          ],
+        },
+        { key: 'baseUrl', type: 'text', label: 'Базовый URL', placeholder: 'https://example.com/cw-old-icons' },
+        {
+          key: 'customMap',
+          type: 'textarea',
+          label: 'Свой словарь',
+          placeholder: '{\n  "1": "https://…/1.png",\n  "exchange": "https://…/exchange.png"\n}',
+        },
+        { key: 'includeExtra', type: 'boolean', label: 'Менять ещё и иконку диалога' },
+      ],
+
+      styles: function (s) {
+        var map = buildMap(s);
+        var css = [];
+
+        Object.keys(map).forEach(function (id) {
+          var url = map[id];
+          if (!url) return;
+          // Экранируем id: он идёт в строковый литерал атрибута.
+          var safeId = String(id).replace(/['\\]/g, '\\$&');
+          css.push("#deys [data-id='" + safeId + "'] > img { content: " + dom.cssUrl(url) + '; }');
+        });
+
+        if (s.includeExtra && s.source === 'builtin') {
+          Object.keys(data.EXTRA).forEach(function (selector) {
+            css.push(selector + ' { content: ' + dom.cssUrl(data.EXTRA[selector]) + '; }');
+          });
+        }
+
+        return css.join('\n');
+      },
+
+      init: function (ctx) {
+        var s = ctx.settings.all();
+        var map = buildMap(s, ctx.log);
+        if (!Object.keys(map).length) {
+          ctx.log.warn('словарь иконок пуст — подменять нечего');
+        }
+      },
+
+      onSettings: function (ctx) {
+        // styles() уже пересобран реестром; своей логики на изменении нет.
+      },
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/modules/pm-ids.js */
+  __def("modules/pm-ids", function (require, module, exports) {
+    /**
+     * ID собеседников на странице личных сообщений (/ls).
+     *
+     * ls.js рисует <a href="cat<ID>"> — ID уже в href, дописываем рядом.
+     * Список перерисовывается AJAX'ом → MutationObserver на #main.
+     * См. RUNTIME.md §8.6 и research/runtime/ls_page.html.
+     */
+
+    var SEL_MAIN = '#main';
+    var SEL_PROFILE = '#main a[href^="cat"]:not([data-cwb-pm-id])';
+    var SEL_MSG_LOGIN = '#msg_login';
+
+    module.exports = {
+      id: 'pm-ids',
+      title: 'ID в личных сообщениях',
+      description: 'Числовой ID рядом с ником в списке и в открытом письме.',
+      category: 'info',
+      pages: ['pm'],
+      enabledByDefault: false,
+      order: 42,
+
+      init: function (ctx) {
+        function stampLinks() {
+          ctx.dom.qsa(SEL_PROFILE).forEach(function (a) {
+            var href = a.getAttribute('href') || '';
+            var id = href.replace(/^cat/, '');
+            if (!/^\d+$/.test(id)) return;
+            a.dataset.cwbPmId = id;
+            var tag = ctx.dom.el('small', {
+              class: 'cwb-pm-id',
+              text: '[' + id + ']',
+              style: { opacity: '0.65', marginLeft: '4px', fontFamily: 'ui-monospace, Menlo, Consolas, monospace' },
+            });
+            a.insertAdjacentElement('afterend', tag);
+            ctx.addCleanup(function () { if (tag.parentNode) tag.parentNode.removeChild(tag); });
+          });
+
+          var msgLogin = ctx.dom.qs(SEL_MSG_LOGIN);
+          if (msgLogin && !msgLogin.dataset.cwbPmId) {
+            var mid = (msgLogin.getAttribute('href') || '').replace(/^cat/, '');
+            if (/^\d+$/.test(mid)) {
+              msgLogin.dataset.cwbPmId = mid;
+              var mtag = ctx.dom.el('small', {
+                class: 'cwb-pm-id',
+                text: ' [' + mid + ']',
+                style: { opacity: '0.65', fontFamily: 'ui-monospace, Menlo, Consolas, monospace' },
+              });
+              msgLogin.insertAdjacentElement('afterend', mtag);
+              ctx.addCleanup(function () { if (mtag.parentNode) mtag.parentNode.removeChild(mtag); });
+            }
+          }
+        }
+
+        return ctx.dom.waitForElement(SEL_MAIN).then(function (main) {
+          if (!main || ctx.isDisposed()) return;
+          stampLinks();
+          ctx.observe(main, stampLinks, { childList: true, subtree: true });
+        });
+      },
+    };
+  });
+
+  /* ====================================================================== */
+  /* src/modules/static-background.js */
+  __def("modules/static-background", function (require, module, exports) {
+    /**
+     * Статичный фон.
+     *
+     * Два независимых слоя:
+     *  - фон игрового поля: #cages_div, куда игра инлайном ставит spacoj/{bg}.jpg;
+     *  - фон страницы: сезонный скин сайта /design/YYYY/season/…/style.css +
+     *    background.png на body.
+     *
+     * CSS-ом сезонный <link> не выключить, поэтому для страницы есть отдельная
+     * опция: помечаем такие stylesheet-ы disabled и возвращаем обратно в destroy.
+     */
+
+    var IS_LU = false;
+    try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
+    var dom = require('core/dom');
+
+    function backgroundValue(s) {
+      if (s.mode === 'image' && String(s.imageUrl || '').trim()) {
+        return dom.cssUrl(String(s.imageUrl).trim()) + ' center / cover no-repeat';
+      }
+      return s.color || '#000000';
+    }
+
+    module.exports = {
+      id: 'static-background',
+      title: 'Статичный фон',
+      description: 'Один и тот же фон вместо сезонного оформления и картинки локации.',
+      category: 'field',
+      pages: ['game'],
+      enabledByDefault: false,
+      order: 30,
+
+      defaults: {
+        target: 'field',          // field | page | both
+        mode: 'color',            // color | image
+        color: '#1d2a1b',
+        imageUrl: '',
+        disableSeasonalCss: false,
+      },
+
+      schema: IS_LU ? [
+        {
+          key: 'mode',
+          type: 'select',
+          label: 'Чем заменить',
+          options: [
+            { value: 'color', label: 'Сплошной цвет' },
+            { value: 'image', label: 'Картинка по ссылке' },
+          ],
+        },
+        { key: 'color', type: 'color', label: 'Цвет' },
+        { key: 'imageUrl', type: 'text', label: 'Ссылка на картинку', placeholder: 'https://…/bg.png' },
+      ] : [
+        {
+          key: 'target',
+          type: 'select',
+          label: 'Что менять',
+          options: [
+            { value: 'field', label: 'Только фон локации' },
+            { value: 'page', label: 'Только фон страницы' },
+            { value: 'both', label: 'И то, и другое' },
+          ],
+        },
+        {
+          key: 'mode',
+          type: 'select',
+          label: 'Чем заменить',
+          options: [
+            { value: 'color', label: 'Сплошной цвет' },
+            { value: 'image', label: 'Картинка по ссылке' },
+          ],
+        },
+        { key: 'color', type: 'color', label: 'Цвет' },
+        { key: 'imageUrl', type: 'text', label: 'Ссылка на картинку', placeholder: 'https://…/bg.png' },
+        {
+          key: 'disableSeasonalCss',
+          type: 'boolean',
+          label: 'Отключить сезонный скин сайта',
+          hint: 'Убирает сезонные стили: шапку, боковины и фон оформления.',
+        },
+      ],
+
+      styles: function (s) {
+        var bg = backgroundValue(s);
+        var css = [];
+        if ((s.target === 'field' || s.target === 'both') && !require('core/uwu').hasFieldBackground()) {
+          // background целиком, чтобы убить и инлайновый background-image локации.
+          css.push('#cages_div { background: ' + bg + ' !important; }');
+        }
+        if (s.target === 'page' || s.target === 'both') {
+          css.push('html, body { background: ' + bg + ' !important; }');
+        }
+        return css.join('\n');
+      },
+
+      init: function (ctx) {
+        if (!ctx.settings.get('disableSeasonalCss')) return;
+
+        var touched = [];
+        dom.qsa('link[rel~="stylesheet"]').forEach(function (link) {
+          var href = link.getAttribute('href') || '';
+          if (href.indexOf('/design/') < 0) return;
+          if (link.disabled) return;
+          link.disabled = true;
+          touched.push(link);
+        });
+        ctx.log.debug('отключено сезонных стилей:', touched.length);
+
+        ctx.addCleanup(function () {
+          touched.forEach(function (link) { link.disabled = false; });
+        });
       },
     };
   });

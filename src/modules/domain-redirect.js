@@ -1,5 +1,5 @@
 /**
- * Редирект и подмена catwar.net → catwar.su.
+ * Редирект и подмена домена.
  *
  * Поведение по мотивам userscript «Перенаправление ссылок CatWar»
  * https://github.com/cat-be/catwar-domain-redirect (автор 1080554, v1.1).
@@ -9,158 +9,205 @@
  * переходах, ссылках и запросах. На живую игру вторую вкладку не открывает.
  */
 
-var FROM_HTTPS = 'https://catwar.net';
-var FROM_HTTP = 'http://catwar.net';
-var FROM_PROTOREL = '//catwar.net';
-var TO = 'https://catwar.su';
-var HOST_RE = /(^|\.)catwar\.net$/i;
+function createRedirectModule(opts) {
+  var fromPrefixes = opts.fromPrefixes;
+  var toOrigin = opts.toOrigin;
+  var hostRe = opts.hostRe;
 
-function replaceDomain(url) {
-  if (!url || typeof url !== 'string') return url;
-  if (url.indexOf(FROM_HTTPS) === 0) return TO + url.slice(FROM_HTTPS.length);
-  if (url.indexOf(FROM_HTTP) === 0) return TO + url.slice(FROM_HTTP.length);
-  if (url.indexOf(FROM_PROTOREL) === 0) return TO + url.slice(FROM_PROTOREL.length);
-  return url;
-}
-
-function rewriteText(text) {
-  if (!text || typeof text !== 'string') return text;
-  return text.split(FROM_HTTPS).join(TO).split(FROM_HTTP).join(TO).split(FROM_PROTOREL).join('//catwar.su');
-}
-
-function rewriteSrcset(value) {
-  if (!value || typeof value !== 'string') return value;
-  return value.split(',').map(function (part) {
-    var trimmed = part.trim();
-    var i = trimmed.indexOf(' ');
-    if (i === -1) return replaceDomain(trimmed);
-    return replaceDomain(trimmed.slice(0, i)) + trimmed.slice(i);
-  }).join(', ');
-}
-
-/** Куда увести открытую страницу catwar.net. Иначе null. */
-function redirectTarget(href) {
-  if (!href || typeof href !== 'string') return null;
-  if (href.indexOf(FROM_HTTPS) === 0) return TO + href.slice(FROM_HTTPS.length);
-  if (href.indexOf(FROM_HTTP) === 0) return TO + href.slice(FROM_HTTP.length);
-  try {
-    var url = new URL(href);
-    if (!HOST_RE.test(url.hostname)) return null;
-    return TO + url.pathname + url.search + url.hash;
-  } catch (e) {
-    return null;
-  }
-}
-
-function rewriteResource(resource) {
-  if (typeof resource === 'string') return replaceDomain(resource);
-  if (resource && typeof Request === 'function' && resource instanceof Request) {
-    var next = replaceDomain(resource.url);
-    if (next === resource.url) return resource;
-    try { return new Request(next, resource); } catch (e) { return resource; }
-  }
-  return resource;
-}
-
-function processElement(el) {
-  if (!el || el.nodeType !== 1 || !el.hasAttribute) return;
-
-  ['href', 'src', 'poster'].forEach(function (attr) {
-    if (!el.hasAttribute(attr)) return;
-    var oldVal = el.getAttribute(attr);
-    var newVal = replaceDomain(oldVal);
-    if (newVal !== oldVal) el.setAttribute(attr, newVal);
-  });
-
-  if (el.hasAttribute('srcset')) {
-    var oldSrcset = el.getAttribute('srcset');
-    var newSrcset = rewriteSrcset(oldSrcset);
-    if (newSrcset !== oldSrcset) el.setAttribute('srcset', newSrcset);
+  function replaceDomain(url) {
+    if (!url || typeof url !== 'string') return url;
+    for (var i = 0; i < fromPrefixes.length; i++) {
+      var p = fromPrefixes[i];
+      if (url.indexOf(p) === 0) return toOrigin + url.slice(p.length);
+    }
+    return url;
   }
 
-  if (el.hasAttribute('style')) {
-    var oldStyle = el.getAttribute('style');
-    var newStyle = rewriteText(oldStyle);
-    if (newStyle !== oldStyle) el.setAttribute('style', newStyle);
-  }
-}
-
-function processAll(root) {
-  if (!root) root = document;
-  if (!root.querySelectorAll) return;
-  var nodes = root.querySelectorAll('[href], [src], [poster], [srcset], [style]');
-  for (var i = 0; i < nodes.length; i++) processElement(nodes[i]);
-}
-
-function applySettings(ctx) {
-  var target = redirectTarget(location.href);
-  if (target && ctx.settings.get('redirectPage')) {
-    try { location.replace(target); } catch (e) { ctx.log.warn('не удалось перенаправить', e); }
-    return;
+  function rewriteText(text) {
+    if (!text || typeof text !== 'string') return text;
+    var result = text;
+    for (var i = 0; i < fromPrefixes.length; i++) {
+      var p = fromPrefixes[i];
+      var repl = (p.slice(0, 2) === '//' && p.indexOf('://') === -1)
+        ? '//' + toOrigin.replace(/^https?:\/\//, '')
+        : toOrigin;
+      result = result.split(p).join(repl);
+    }
+    return result;
   }
 
-  if (ctx.settings.get('rewriteDom')) {
-    processAll(document);
-    ctx.on(document, 'DOMContentLoaded', function () { processAll(document); });
-    ctx.on(document, 'click', function (e) {
-      var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
-      if (!link) return;
-      var oldHref = link.getAttribute('href');
-      var newHref = replaceDomain(oldHref);
-      if (newHref !== oldHref) link.setAttribute('href', newHref);
-    }, true);
+  function rewriteSrcset(value) {
+    if (!value || typeof value !== 'string') return value;
+    return value.split(',').map(function (part) {
+      var trimmed = part.trim();
+      var i = trimmed.indexOf(' ');
+      if (i === -1) return replaceDomain(trimmed);
+      return replaceDomain(trimmed.slice(0, i)) + trimmed.slice(i);
+    }).join(', ');
+  }
 
-    var originalOpen = window.open;
-    window.open = function (url) {
-      var next = replaceDomain(url);
-      var args = [next].concat([].slice.call(arguments, 1));
-      if (typeof originalOpen === 'function') return originalOpen.apply(this, args);
+  /** Куда увести открытую страницу. Иначе null. */
+  function redirectTarget(href) {
+    if (!href || typeof href !== 'string') return null;
+    for (var i = 0; i < fromPrefixes.length; i++) {
+      var p = fromPrefixes[i];
+      if (href.indexOf(p) === 0) return toOrigin + href.slice(p.length);
+    }
+    try {
+      var url = new URL(href);
+      if (!hostRe.test(url.hostname)) return null;
+      return toOrigin + url.pathname + url.search + url.hash;
+    } catch (e) {
       return null;
-    };
-    ctx.addCleanup(function () { window.open = originalOpen; });
+    }
+  }
 
-    var root = document.documentElement || document;
-    ctx.observe(root, function (mutations) {
-      for (var i = 0; i < mutations.length; i++) {
-        var mutation = mutations[i];
-        if (mutation.type === 'attributes') processElement(mutation.target);
-        var nodes = mutation.addedNodes;
-        for (var j = 0; j < nodes.length; j++) {
-          var node = nodes[j];
-          if (!node || node.nodeType !== 1) continue;
-          processElement(node);
-          processAll(node);
-        }
-      }
-    }, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['href', 'src', 'poster', 'srcset', 'style'],
+  function rewriteResource(resource) {
+    if (typeof resource === 'string') return replaceDomain(resource);
+    if (resource && typeof Request === 'function' && resource instanceof Request) {
+      var next = replaceDomain(resource.url);
+      if (next === resource.url) return resource;
+      try { return new Request(next, resource); } catch (e) { return resource; }
+    }
+    return resource;
+  }
+
+  function processElement(el) {
+    if (!el || el.nodeType !== 1 || !el.hasAttribute) return;
+
+    ['href', 'src', 'poster'].forEach(function (attr) {
+      if (!el.hasAttribute(attr)) return;
+      var oldVal = el.getAttribute(attr);
+      var newVal = replaceDomain(oldVal);
+      if (newVal !== oldVal) el.setAttribute(attr, newVal);
     });
-  }
 
-  if (ctx.settings.get('interceptNetwork')) {
-    if (typeof window.fetch === 'function') {
-      var originalFetch = window.fetch;
-      window.fetch = function (resource, init) {
-        return originalFetch.call(this, rewriteResource(resource), init);
-      };
-      ctx.addCleanup(function () { window.fetch = originalFetch; });
+    if (el.hasAttribute('srcset')) {
+      var oldSrcset = el.getAttribute('srcset');
+      var newSrcset = rewriteSrcset(oldSrcset);
+      if (newSrcset !== oldSrcset) el.setAttribute('srcset', newSrcset);
     }
 
-    if (typeof XMLHttpRequest === 'function' && XMLHttpRequest.prototype) {
-      var originalXhrOpen = XMLHttpRequest.prototype.open;
-      XMLHttpRequest.prototype.open = function (method, url) {
-        var args = [method, replaceDomain(url)].concat([].slice.call(arguments, 2));
-        return originalXhrOpen.apply(this, args);
-      };
-      ctx.addCleanup(function () { XMLHttpRequest.prototype.open = originalXhrOpen; });
+    if (el.hasAttribute('style')) {
+      var oldStyle = el.getAttribute('style');
+      var newStyle = rewriteText(oldStyle);
+      if (newStyle !== oldStyle) el.setAttribute('style', newStyle);
     }
   }
+
+  function processAll(root) {
+    if (!root) root = document;
+    if (!root.querySelectorAll) return;
+    var nodes = root.querySelectorAll('[href], [src], [poster], [srcset], [style]');
+    for (var i = 0; i < nodes.length; i++) processElement(nodes[i]);
+  }
+
+  function applySettings(ctx) {
+    var target = redirectTarget(location.href);
+    if (target && ctx.settings.get('redirectPage')) {
+      try { location.replace(target); } catch (e) { ctx.log.warn('не удалось перенаправить', e); }
+      return;
+    }
+
+    if (ctx.settings.get('rewriteDom')) {
+      processAll(document);
+      ctx.on(document, 'DOMContentLoaded', function () { processAll(document); });
+      ctx.on(document, 'click', function (e) {
+        var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+        if (!link) return;
+        var oldHref = link.getAttribute('href');
+        var newHref = replaceDomain(oldHref);
+        if (newHref !== oldHref) link.setAttribute('href', newHref);
+      }, true);
+
+      var originalOpen = window.open;
+      window.open = function (url) {
+        var next = replaceDomain(url);
+        var args = [next].concat([].slice.call(arguments, 1));
+        if (typeof originalOpen === 'function') return originalOpen.apply(this, args);
+        return null;
+      };
+      ctx.addCleanup(function () { window.open = originalOpen; });
+
+      var root = document.documentElement || document;
+      ctx.observe(root, function (mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          var mutation = mutations[i];
+          if (mutation.type === 'attributes') processElement(mutation.target);
+          var nodes = mutation.addedNodes;
+          for (var j = 0; j < nodes.length; j++) {
+            var node = nodes[j];
+            if (!node || node.nodeType !== 1) continue;
+            processElement(node);
+            processAll(node);
+          }
+        }
+      }, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['href', 'src', 'poster', 'srcset', 'style'],
+      });
+    }
+
+    if (ctx.settings.get('interceptNetwork')) {
+      if (typeof window.fetch === 'function') {
+        var originalFetch = window.fetch;
+        window.fetch = function (resource, init) {
+          return originalFetch.call(this, rewriteResource(resource), init);
+        };
+        ctx.addCleanup(function () { window.fetch = originalFetch; });
+      }
+
+      if (typeof XMLHttpRequest === 'function' && XMLHttpRequest.prototype) {
+        var originalXhrOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function (method, url) {
+          var args = [method, replaceDomain(url)].concat([].slice.call(arguments, 2));
+          return originalXhrOpen.apply(this, args);
+        };
+        ctx.addCleanup(function () { XMLHttpRequest.prototype.open = originalXhrOpen; });
+      }
+    }
+  }
+
+  var mod = {
+    id: opts.id,
+    title: opts.title,
+    description: opts.description,
+    category: opts.category,
+    pages: opts.pages,
+    early: opts.early,
+    enabledByDefault: opts.enabledByDefault,
+    order: opts.order,
+    compat: opts.compat,
+
+    defaults: opts.defaults,
+
+    schema: opts.schema,
+
+    init: function (ctx) {
+      if (opts.init) {
+        var result = opts.init(ctx);
+        if (result === false) return;
+      }
+      applySettings(ctx);
+    },
+  };
+
+  mod.replaceDomain = replaceDomain;
+  mod.redirectTarget = redirectTarget;
+  mod.rewriteSrcset = rewriteSrcset;
+  mod.rewriteText = rewriteText;
+  mod.rewriteResource = rewriteResource;
+  mod.processElement = processElement;
+
+  return mod;
 }
 
-var mod = {
+var IS_LU = false;
+try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
+var mod = createRedirectModule({
   id: 'domain-redirect',
   title: 'Редирект catwar.net → .su',
   description: 'Кидает с catwar.net на catwar.su и чинит ссылки, картинки и запросы. По умолчанию включён.',
@@ -171,13 +218,17 @@ var mod = {
   order: 5,
   compat: 'new',
 
+  fromPrefixes: ['https://catwar.net', 'http://catwar.net', '//catwar.net'],
+  toOrigin: 'https://catwar.su',
+  hostRe: /(^|\.)catwar\.net$/i,
+
   defaults: {
     redirectPage: true,
     rewriteDom: true,
     interceptNetwork: true,
   },
 
-  schema: [
+  schema: IS_LU ? [] : [
     {
       key: 'redirectPage',
       type: 'boolean',
@@ -197,17 +248,22 @@ var mod = {
       hint: 'Свои запросы не шлёт, только правит адрес у тех, что уже идут.',
     },
   ],
+});
 
-  init: function (ctx) {
-    applySettings(ctx);
-  },
+/* Если работает обратный редирект (su → .net), а включили нас (net → .su) —
+   останавливаем его: работают оба = бесконечный ping-pong редиректов.
+   Обратный порядок (включили reverse при работающем нами) закрыт в его init. */
+var origInit = mod.init;
+mod.init = function (ctx) {
+  try {
+    var registry = require('core/registry');
+    if (registry && typeof registry.isRunning === 'function' && registry.isRunning('domain-redirect-reverse')) {
+      registry.setEnabled('domain-redirect-reverse', false);
+      ctx.log.warn('обратный редирект (su → .net) выключен: работает net → .su');
+    }
+  } catch (e) { /* реестр недоступен (юнит-тесты в Node) — пропускаем */ }
+  origInit(ctx);
 };
 
-mod.replaceDomain = replaceDomain;
-mod.redirectTarget = redirectTarget;
-mod.rewriteSrcset = rewriteSrcset;
-mod.rewriteText = rewriteText;
-mod.rewriteResource = rewriteResource;
-mod.processElement = processElement;
-
 module.exports = mod;
+module.exports.createRedirectModule = createRedirectModule;

@@ -10,6 +10,9 @@
  * опция: помечаем такие stylesheet-ы disabled и возвращаем обратно в destroy.
  */
 
+var IS_LU = false;
+try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
 var dom = require('core/dom');
 
 function backgroundValue(s) {
@@ -36,7 +39,19 @@ module.exports = {
     disableSeasonalCss: false,
   },
 
-  schema: [
+  schema: IS_LU ? [
+    {
+      key: 'mode',
+      type: 'select',
+      label: 'Чем заменить',
+      options: [
+        { value: 'color', label: 'Сплошной цвет' },
+        { value: 'image', label: 'Картинка по ссылке' },
+      ],
+    },
+    { key: 'color', type: 'color', label: 'Цвет' },
+    { key: 'imageUrl', type: 'text', label: 'Ссылка на картинку', placeholder: 'https://…/bg.png' },
+  ] : [
     {
       key: 'target',
       type: 'select',

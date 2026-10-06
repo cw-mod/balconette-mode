@@ -2,9 +2,9 @@
 // @name         CatWar Balconette — ЛУ
 // @name:ru      CatWar Balconette — ЛУ
 // @namespace    catwar-balconette-lu
-// @version      0.1.7
-// @description  Только поле для лазательных умений (минное поле, кач ЛУ, импорт и живая запись в UwU).
-// @description:ru Только поле для лазательных умений (минное поле, кач ЛУ, импорт и живая запись в UwU).
+// @version      0.2.0
+// @description  Поле для лазательных умений и подборка модов balconette: координаты клеток, кот ↔ действия, старые иконки, автопрокрутка, ID в ЛС, уведомления, редиректы, статичный фон, погода.
+// @description:ru Поле для лазательных умений и подборка модов balconette: координаты клеток, кот ↔ действия, старые иконки, автопрокрутка, ID в ЛС, уведомления, редиректы, статичный фон, погода.
 // @author       balconette
 // @license      MIT
 // @homepageURL  https://cw-mod.github.io/balconette-mode/

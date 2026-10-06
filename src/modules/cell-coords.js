@@ -6,6 +6,9 @@
  * См. CORRECTIONS.md и RUNTIME.md §8.10.
  */
 
+var IS_LU = false;
+try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
 var SEL_TABLE = '#cages';
 var SEL_CELL = SEL_TABLE + ' td.cage';
 
@@ -32,7 +35,7 @@ module.exports = {
     hideInSmell: true,
   },
 
-  schema: [
+  schema: IS_LU ? [] : [
     { key: 'showTree', type: 'boolean', label: 'Показывать ярус дерева' },
     { key: 'hideInSmell', type: 'boolean', label: 'Скрывать в режиме нюха' },
   ],

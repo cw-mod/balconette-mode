@@ -1,6 +1,6 @@
 {
   "name": "catwar-balconette",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "private": true,
   "description": "Модульный юзерскрипт для CatWar (Tampermonkey)",
   "license": "MIT",
@@ -8,6 +8,6 @@
     "build": "node build.js",
     "watch": "node build.js --watch",
     "check": "node build.js && node --check dist/catwar-balconette.user.js && echo OK",
-    "smoke": "node build.js && node test/domain-redirect.js && node test/smoke.js"
+    "smoke": "node build.js && node test/domain-redirect.js && node test/smoke.js && node test/smoke-lu.js"
   }
 }

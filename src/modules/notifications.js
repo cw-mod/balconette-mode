@@ -9,6 +9,8 @@
 var audio = require('core/audio');
 var dom = require('core/dom');
 
+var IS_LU = require('cwb:meta').variant === 'lu';
+
 var PERM_BTN = 'cwb-notify-perm';
 
 module.exports = {
@@ -28,19 +30,47 @@ module.exports = {
     volume: 0.4,
   },
 
-  schema: [
-    { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
-    { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
-    { key: 'sound', type: 'boolean', label: 'Звук при уведомлении' },
-    { key: 'blinkTitle', type: 'boolean', label: 'Мигать заголовком вкладки' },
-    { key: 'volume', type: 'range', label: 'Громкость звука', min: 0.05, max: 1, step: 0.05 },
-    {
-      key: '_perm',
-      type: 'boolean',
-      label: 'Запросить разрешение браузера',
-      hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
-    },
-  ],
+  schema: IS_LU
+    ? [
+        { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
+        { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
+        { key: 'volume', type: 'range', label: 'Громкость звука', min: 0, max: 1, step: 0.05 },
+        {
+          key: '_testSound',
+          type: 'custom',
+          label: 'Проверить звук',
+          render: function () {
+            return dom.el('button', {
+              type: 'button',
+              class: 'cwb-btn',
+              text: 'Проверить звук',
+              onclick: function () {
+                var registry = require('core/registry');
+                audio.play('pm', registry.settingsOf('notifications').volume);
+              },
+            });
+          },
+        },
+        {
+          key: '_perm',
+          type: 'boolean',
+          label: 'Запросить разрешение браузера',
+          hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
+        },
+      ]
+    : [
+        { key: 'onPm', type: 'boolean', label: 'Новое личное сообщение' },
+        { key: 'onMention', type: 'boolean', label: 'Упоминание в чате' },
+        { key: 'sound', type: 'boolean', label: 'Звук при уведомлении' },
+        { key: 'blinkTitle', type: 'boolean', label: 'Мигать заголовком вкладки' },
+        { key: 'volume', type: 'range', label: 'Громкость звука', min: 0.05, max: 1, step: 0.05 },
+        {
+          key: '_perm',
+          type: 'boolean',
+          label: 'Запросить разрешение браузера',
+          hint: 'Включи — браузер спросит разрешение. Сам не спрашиваем.',
+        },
+      ],
 
   init: function (ctx) {
     var origTitle = document.title;
@@ -66,8 +96,12 @@ module.exports = {
     }
 
     function notify(title, body, kind) {
-      if (ctx.settings.get('sound')) audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
-      blink(title);
+      if (IS_LU) {
+        audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
+      } else {
+        if (ctx.settings.get('sound')) audio.play(kind === 'pm' ? 'pm' : 'mention', ctx.settings.get('volume'));
+        blink(title);
+      }
       if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
       try {
         var n = new Notification(title, { body: body, tag: 'cwb-' + kind });

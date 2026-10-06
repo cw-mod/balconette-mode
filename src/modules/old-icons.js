@@ -15,6 +15,9 @@
  *   custom  — свой JSON {"1": "https://…", "exchange": "https://…"}.
  */
 
+var IS_LU = false;
+try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
 var data = require('data/old-icons');
 var dom = require('core/dom');
 
@@ -51,7 +54,7 @@ module.exports = {
   pages: ['game'],
   enabledByDefault: false,
   order: 20,
-  warning: 'Встроенный список неполный (' + data.count + ' иконок) и тянет картинки с d.zaix.ru. Лучше свой URL или свой словарь.',
+  warning: IS_LU ? 'Иконки грузятся со стороннего хоста d.zaix.ru.' : 'Встроенный список неполный (' + data.count + ' иконок) и тянет картинки с d.zaix.ru. Лучше свой URL или свой словарь.',
 
   defaults: {
     source: 'builtin',     // builtin | base | custom
@@ -60,7 +63,7 @@ module.exports = {
     includeExtra: true,
   },
 
-  schema: [
+  schema: IS_LU ? [] : [
     {
       key: 'source',
       type: 'select',

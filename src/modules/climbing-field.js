@@ -466,13 +466,15 @@ function cageTdAt(x, y) {
   return tds[(y - 1) * COLS + (x - 1)] || null;
 }
 
+var IS_LU = require('cwb:meta').variant === 'lu';
+
 module.exports = {
   id: 'climbing-field',
   title: 'Поле для ЛУ',
   description: 'Минное поле 10×6: вкладки, локации, цифры треска, мины и переходы. Карты не слетают после обновления.',
   category: 'field',
   pages: ['game'],
-  enabledByDefault: require('cwb:meta').variant === 'lu',
+  enabledByDefault: IS_LU,
   order: 25,
 
   defaults: {
@@ -488,7 +490,27 @@ module.exports = {
     clearOnLocation: false,
   },
 
-  schema: [
+  schema: IS_LU ? [
+    {
+      key: 'blockDangerous',
+      type: 'boolean',
+      label: 'Кач ЛУ: не нажимать на опасные клетки',
+      hint: 'Не даёт кликнуть и пойти с клавиатуры (WASD, QEZX) на мины, опаски и unsafe. Выключи, если хочешь ходить как обычно.',
+    },
+    {
+      key: 'autoFromChat',
+      type: 'boolean',
+      label: 'Ставить цифру в клетку кота по треску в чате',
+      hint: 'Берёт громкость из [треск] (0–7) и ставит в клетку, где стоит твой кот. Обычные системные реплики не считает.',
+    },
+    {
+      key: 'mapsEditor',
+      type: 'custom',
+      label: 'Вкладки и поля',
+      hint: 'Добавить, удалить или переименовать вкладки и таблицы внутри выбранной вкладки.',
+      render: renderMapsEditor,
+    },
+  ] : [
     {
       key: 'overlay',
       type: 'boolean',
@@ -593,7 +615,8 @@ module.exports = {
       'z-index:40;font:700 12px/1 ui-monospace,Menlo,Consolas,monospace;padding:1px 3px;border-radius:3px;',
       'background:rgba(0,0,0,.78);color:#ffe9a8;pointer-events:none;}',
       '#cages td.cage[data-cwb-lu="X"]::after{background:rgba(160,0,0,.85);color:#fff;}',
-      '#cages td.cage[data-cwb-lu="="]::after{background:rgba(255,255,255,.75);color:#222;}',
+      '#cwb-lu-overlay{display:flex;align-items:center;gap:5px;margin:0 0 6px;font-size:11px;cursor:pointer;opacity:.9;}',
+      '#cwb-lu-overlay:hover{opacity:1;}',
     ].join('');
   },
 
@@ -656,12 +679,19 @@ module.exports = {
 
     var tabsEl = dom.el('div', { id: 'cwb-lu-tabs' });
     var fieldsEl = dom.el('div', { id: 'cwb-lu-fields' });
-    var nav = dom.el('div', { id: 'cwb-lu-nav' }, [
-      dom.el('h3', { text: 'Вкладка' }),
-      tabsEl,
-      dom.el('h3', { text: 'Локация' }),
-      fieldsEl,
-    ]);
+    var overlayInput = dom.el('input', { type: 'checkbox', checked: !!ctx.settings.get('overlay') });
+    var overlayLabel = IS_LU ? dom.el('label', {
+      id: 'cwb-lu-overlay',
+      title: 'Дублировать пометки (безопасно/мина/переход) и цифры на клетках игрового поля',
+    }, [overlayInput, document.createTextNode(' Переносить на игровую')]) : null;
+    if (overlayLabel) {
+      overlayLabel.addEventListener('change', function (e) {
+        if (e.target === overlayInput) ctx.settings.set('overlay', e.target.checked);
+      });
+    }
+    var navChildren = [dom.el('h3', { text: 'Вкладка' }), tabsEl, dom.el('h3', { text: 'Локация' }), fieldsEl];
+    if (overlayLabel) navChildren.unshift(overlayLabel);
+    var nav = dom.el('div', { id: 'cwb-lu-nav' }, navChildren);
     var emptyEl = dom.el('div', { id: 'cwb-lu-empty', text: 'Добавь поле или таблицу в настройках' });
     var trainBtn = dom.el('button', {
       type: 'button',

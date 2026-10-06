@@ -17,6 +17,7 @@ var storage = require('core/storage');
 var config = require('core/config');
 var uwu = require('core/uwu');
 var meta = require('cwb:meta');
+var IS_LU = meta.variant === 'lu';
 
 var ROOT_ID = 'cwb-root';
 var STYLE_ID = 'core-ui';
@@ -123,6 +124,7 @@ function css() {
     '.cwb-opt input[type=range]{width:150px;}',
     '.cwb-opt-val{font-size:12px;color:#8a7f70;min-width:34px;}',
     '.cwb-opt-full{flex-direction:column;align-items:stretch;}',
+    '.cwb-opt-full .cwb-opt-label{flex:0 0 auto;}',
 
     '.cwb-maps-editor{display:flex;flex-direction:column;gap:8px;width:100%;}',
     '.cwb-maps-editor h4{margin:4px 0 0;font-size:12px;}',
@@ -256,14 +258,16 @@ function moduleCard(mod) {
         registry.setSetting(mod.id, item.key, value);
       }));
     });
-    opts.appendChild(dom.el('div', { class: 'cwb-opt' }, [
-      dom.el('button', {
-        class: 'cwb-btn',
-        type: 'button',
-        text: 'Сбросить настройки',
-        onclick: function () { registry.resetSettings(mod.id); render(); },
-      }),
-    ]));
+    if (!IS_LU) {
+      opts.appendChild(dom.el('div', { class: 'cwb-opt' }, [
+        dom.el('button', {
+          class: 'cwb-btn',
+          type: 'button',
+          text: 'Сбросить настройки',
+          onclick: function () { registry.resetSettings(mod.id); render(); },
+        }),
+      ]));
+    }
   }
 
   var sw = dom.el('label', { class: 'cwb-sw' }, [
@@ -396,10 +400,10 @@ function render() {
   var focusHint = captureFocusHint();
   var query = state.query.trim().toLowerCase();
   state.listEl.textContent = '';
-  paintTabs();
+  if (!IS_LU) paintTabs();
 
-  if (!query && state.tab === 'new') state.listEl.appendChild(coreCard());
-  if (!query && state.tab === 'overlay') {
+  if (!query && (IS_LU || state.tab === 'new')) state.listEl.appendChild(coreCard());
+  if (!query && !IS_LU && state.tab === 'overlay') {
     state.listEl.appendChild(dom.el('div', {
       class: 'cwb-uwu-banner',
       text: uwu.present()
@@ -412,7 +416,7 @@ function render() {
   registry.CATEGORIES.forEach(function (cat) {
     var mods = registry.list().filter(function (m) {
       if (m.category !== cat.id || !matchesQuery(m, query)) return false;
-      return query ? true : matchesTab(m, state.tab);
+      return query || IS_LU ? true : matchesTab(m, state.tab);
     });
     if (!mods.length) return;
     shown += mods.length;
@@ -497,61 +501,69 @@ function mount() {
   var search = dom.el('input', { class: 'cwb-search', type: 'search', placeholder: 'Поиск по модулям…' });
   search.addEventListener('input', function (e) { state.query = e.target.value; render(); });
 
-  var tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
-  TABS.forEach(function (tab) {
-    var btn = dom.el('button', {
-      class: 'cwb-tab',
-      type: 'button',
-      role: 'tab',
-      'data-cwb-tab': tab.id,
-      'aria-selected': tab.id === state.tab ? 'true' : 'false',
-      text: tab.title,
+  var tabs = null;
+  var tabNote = null;
+  if (!IS_LU) {
+    tabs = dom.el('div', { class: 'cwb-tabs', role: 'tablist' });
+    TABS.forEach(function (tab) {
+      var btn = dom.el('button', {
+        class: 'cwb-tab',
+        type: 'button',
+        role: 'tab',
+        'data-cwb-tab': tab.id,
+        'aria-selected': tab.id === state.tab ? 'true' : 'false',
+        text: tab.title,
+      });
+      btn.addEventListener('click', function () {
+        if (state.tab === tab.id) return;
+        state.tab = tab.id;
+        render();
+      });
+      tabs.appendChild(btn);
     });
-    btn.addEventListener('click', function () {
-      if (state.tab === tab.id) return;
-      state.tab = tab.id;
-      render();
-    });
-    tabs.appendChild(btn);
-  });
-  var tabNote = dom.el('div', { class: 'cwb-tab-note' });
+    tabNote = dom.el('div', { class: 'cwb-tab-note' });
+  }
 
   var list = dom.el('div', { class: 'cwb-body' });
 
-  var modal = dom.el('div', { class: 'cwb-modal' }, [
+  var modalChildren = [
     dom.el('div', { class: 'cwb-head' }, [
       dom.el('div', { class: 'cwb-title', text: 'CatWar Balconette' }),
       dom.el('div', { class: 'cwb-ver', text: 'v' + meta.version }),
       search,
       dom.el('button', { class: 'cwb-x', type: 'button', title: 'Закрыть', text: '×', onclick: close }),
     ]),
-    tabs,
-    tabNote,
-    list,
-    dom.el('div', { class: 'cwb-foot' }, [
-      dom.el('button', {
-        class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
-        onclick: function () {
-          try { storage.exportToFile(); toast('Настройки сохранены'); }
-          catch (e) { log.error(e); toast('Не получилось сохранить настройки'); }
-        },
-      }),
-      dom.el('button', {
-        class: 'cwb-btn', type: 'button', text: 'Импорт настроек',
-        onclick: function () {
-          storage.importFromFile().then(function (count) {
-            if (!count) return;
-            toast('Загружено: ' + count + '. Перезагрузи страницу.');
-            render();
-          }).catch(function (e) {
-            log.error(e);
-            toast('Файл не подошёл: ' + e.message);
-          });
-        },
-      }),
-      dom.el('div', { class: 'cwb-foot-note', text: 'Хранилище: ' + storage.backend }),
-    ]),
-  ]);
+  ];
+  if (tabs) {
+    modalChildren.push(tabs);
+    modalChildren.push(tabNote);
+  }
+  modalChildren.push(list);
+  modalChildren.push(dom.el('div', { class: 'cwb-foot' }, [
+    dom.el('button', {
+      class: 'cwb-btn', type: 'button', text: 'Экспорт настроек',
+      onclick: function () {
+        try { storage.exportToFile(); toast('Настройки сохранены'); }
+        catch (e) { log.error(e); toast('Не получилось сохранить настройки'); }
+      },
+    }),
+    dom.el('button', {
+      class: 'cwb-btn', type: 'button', text: 'Импорт настроек',
+      onclick: function () {
+        storage.importFromFile().then(function (count) {
+          if (!count) return;
+          toast('Загружено: ' + count + '. Перезагрузи страницу.');
+          render();
+        }).catch(function (e) {
+          log.error(e);
+          toast('Файл не подошёл: ' + e.message);
+        });
+      },
+    }),
+    dom.el('div', { class: 'cwb-foot-note', text: 'Хранилище: ' + storage.backend }),
+  ]));
+
+  var modal = dom.el('div', { class: 'cwb-modal' }, modalChildren);
 
   var overlay = dom.el('div', { class: 'cwb-overlay', hidden: true }, [modal]);
   overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) close(); });
@@ -581,8 +593,8 @@ function mount() {
     }
   }, true));
 
-  // Панель живёт рядом с реестром: любое изменение — перерисовка.
-  state.offRegistry = registry.onChange(function () { if (state.open) render(); });
+  // Панель живёт рядом с реестром: перерисовка только при вкл/выкл модуля.
+  state.offRegistry = registry.onChange(function (id, kind) { if (state.open && kind === 'enabled') render(); });
   config.onChange(applyCoreSettings);
 
   applyCoreSettings();

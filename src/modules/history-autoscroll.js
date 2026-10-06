@@ -10,6 +10,9 @@
  * дублируя более надёжным $watch по стейту, если Vue доступен.
  */
 
+var IS_LU = false;
+try { IS_LU = require('cwb:meta').variant === 'lu'; } catch (e) {}
+
 var dom = require('core/dom');
 
 module.exports = {
@@ -27,7 +30,7 @@ module.exports = {
     smooth: false,
   },
 
-  schema: [
+  schema: IS_LU ? [] : [
     {
       key: 'respectUserScroll',
       type: 'boolean',
